@@ -1,21 +1,27 @@
+"use client";
+
+import { useAuth } from "@/features/auth/AuthProvider";
+import LoginPage from "@/features/auth/LoginPage";
+import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { useSyncUser } from "@/hooks/useSyncUser";
+import { Loader2 } from "lucide-react";
+
 export default function Home() {
-  return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center">
-      <div className="text-center space-y-4">
-        <h1 className="text-5xl font-bold text-amber-500">
-          PrepSathi
-        </h1>
+  const { user, loading } = useAuth();
 
-        <p className="text-slate-300 text-lg">
-          Your Personal AI Study Companion
-        </p>
+  useSyncUser();
 
-        <div className="mt-8 rounded-xl border border-slate-700 bg-slate-900 p-6 w-80">
-          <p className="text-slate-400">
-            🚀 Foundation Successfully Created
-          </p>
-        </div>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#020617] flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
       </div>
-    </main>
-  );
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  return <DashboardPage />;
 }
