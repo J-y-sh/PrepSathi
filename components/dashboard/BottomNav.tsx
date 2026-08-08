@@ -6,16 +6,17 @@ import {
   Timer,
   Library,
   FlaskConical,
-  BarChart3
+  BarChart3,
+  ListTodo
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavStore } from "@/store/useNavStore";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Home", id: "dashboard" as const },
+  { icon: ListTodo, label: "Planner", id: "planner" as const },
   { icon: Timer, label: "Sprint", id: "sprint" as const },
   { icon: Library, label: "Library", id: "library" as const },
-  { icon: FlaskConical, label: "Sandbox", id: "sandbox" as const },
   { icon: BarChart3, label: "Data", id: "analytics" as const },
 ];
 

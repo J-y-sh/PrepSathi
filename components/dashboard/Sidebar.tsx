@@ -9,7 +9,8 @@ import {
   BarChart3,
   ChevronLeft,
   ChevronRight,
-  LogOut
+  LogOut,
+  ListTodo
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/AuthProvider";
@@ -17,6 +18,7 @@ import { useNavStore } from "@/store/useNavStore";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", id: "dashboard" as const },
+  { icon: ListTodo, label: "Planner", id: "planner" as const },
   { icon: Timer, label: "Sprint", id: "sprint" as const },
   { icon: Library, label: "Library", id: "library" as const },
   { icon: FlaskConical, label: "Sandbox", id: "sandbox" as const },

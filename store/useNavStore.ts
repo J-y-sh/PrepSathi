@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-type NavTab = "dashboard" | "sprint" | "library" | "sandbox" | "analytics";
+type NavTab = "dashboard" | "sprint" | "planner" | "library" | "sandbox" | "analytics";
 
 interface NavState {
   activeTab: NavTab;

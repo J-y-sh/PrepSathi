@@ -1,4 +1,9 @@
-import { where, serverTimestamp } from "firebase/firestore";
+import {
+  where,
+  orderBy,
+  serverTimestamp,
+} from "firebase/firestore";
+
 import { Task } from "@/types/Task";
 import { BaseService } from "./baseService";
 
@@ -8,13 +13,16 @@ class TaskService extends BaseService<Task> {
   }
 
   async listByUser(userId: string): Promise<Task[]> {
-    return this.list([where("userId", "==", userId)]);
+    return this.list([
+      where("userId", "==", userId),
+      orderBy("createdAt", "desc"),
+    ]);
   }
 
-  async createWithTimestamp(id: string, data: Omit<Task, "id" | "createdAt">): Promise<void> {
-    await this.create(id, {
-      ...data,
-      createdAt: serverTimestamp(),
+  async markCompleted(id: string, completed: boolean) {
+    await this.update(id, {
+      completed,
+      completedAt: completed ? serverTimestamp() : null,
     } as any);
   }
 }

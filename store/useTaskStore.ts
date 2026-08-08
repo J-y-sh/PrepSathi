@@ -1,84 +1,91 @@
 import { create } from "zustand";
+import { serverTimestamp } from "firebase/firestore";
+
 import { Task } from "@/types/Task";
 import { taskService } from "@/services/firestore/taskService";
-import { where, orderBy, Timestamp } from "firebase/firestore";
 
-interface TaskState {
+interface TaskStore {
   tasks: Task[];
   loading: boolean;
   error: string | null;
-  fetchTasks: (userId: string) => Promise<void>;
-  addTask: (userId: string, title: string, description: string, dueDate?: Date) => Promise<void>;
-  updateTask: (taskId: string, data: Partial<Task>) => Promise<void>;
-  deleteTask: (taskId: string) => Promise<void>;
-  toggleTaskStatus: (taskId: string) => Promise<void>;
+
+  fetchTasks(userId: string): Promise<void>;
+
+  addTask(
+    userId: string,
+    task: Omit<
+      Task,
+      | "id"
+      | "userId"
+      | "createdAt"
+      | "completed"
+      | "completedAt"
+    >
+  ): Promise<void>;
+
+  toggleComplete(id: string, completed: boolean): Promise<void>;
+
+  deleteTask(id: string): Promise<void>;
 }
 
-export const useTaskStore = create<TaskState>((set, get) => ({
+export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: [],
+
   loading: false,
+
   error: null,
 
-  fetchTasks: async (userId: string) => {
-    set({ loading: true, error: null });
-    try {
-      const tasks = await taskService.list([
-        where("userId", "==", userId),
-        orderBy("createdAt", "desc")
-      ]);
-      set({ tasks, loading: false });
-    } catch (err: any) {
-      set({ error: err.message, loading: false });
-    }
-  },
-
-  addTask: async (userId: string, title: string, description: string, dueDate?: Date) => {
-    const taskId = crypto.randomUUID();
-    const newTask: Omit<Task, "id" | "createdAt"> = {
-      userId,
-      title,
-      description,
-      status: "todo",
-      dueDate: dueDate ? Timestamp.fromDate(dueDate) : null,
-    };
+  fetchTasks: async (userId) => {
+    set({ loading: true });
 
     try {
-      await taskService.createWithTimestamp(taskId, newTask);
-      // Optimistic update or refetch
-      get().fetchTasks(userId);
-    } catch (err: any) {
-      set({ error: err.message });
-    }
-  },
+      const tasks = await taskService.listByUser(userId);
 
-  updateTask: async (taskId: string, data: Partial<Task>) => {
-    try {
-      await taskService.update(taskId, data as any);
-      const { tasks } = get();
       set({
-        tasks: tasks.map((t) => (t.id === taskId ? { ...t, ...data } : t)),
+        tasks,
+        loading: false,
       });
-    } catch (err: any) {
-      set({ error: err.message });
+    } catch (e: any) {
+      set({
+        loading: false,
+        error: e.message,
+      });
     }
   },
 
-  deleteTask: async (taskId: string) => {
-    try {
-      await taskService.delete(taskId);
-      const { tasks } = get();
-      set({ tasks: tasks.filter((t) => t.id !== taskId) });
-    } catch (err: any) {
-      set({ error: err.message });
-    }
+  addTask: async (userId, task) => {
+    const id = crypto.randomUUID();
+
+    await taskService.create(id, {
+      ...task,
+      userId,
+      completed: false,
+      createdAt: serverTimestamp(),
+    } as any);
+
+    await get().fetchTasks(userId);
   },
 
-  toggleTaskStatus: async (taskId: string) => {
-    const { tasks } = get();
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
+  toggleComplete: async (id, completed) => {
+    await taskService.markCompleted(id, !completed);
 
-    const newStatus = task.status === "completed" ? "todo" : "completed";
-    await get().updateTask(taskId, { status: newStatus });
+    set((state) => ({
+      tasks: state.tasks.map((task) =>
+        task.id === id
+          ? {
+              ...task,
+              completed: !completed,
+            }
+          : task
+      ),
+    }));
+  },
+
+  deleteTask: async (id) => {
+    await taskService.delete(id);
+
+    set((state) => ({
+      tasks: state.tasks.filter((t) => t.id !== id),
+    }));
   },
 }));

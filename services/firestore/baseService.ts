@@ -10,8 +10,9 @@ import {
   QueryConstraint,
   DocumentData,
   WithFieldValue,
-  UpdateData
+  UpdateData,
 } from "firebase/firestore";
+
 import { db } from "@/firebase/firebase";
 
 export class BaseService<T extends DocumentData> {
@@ -21,31 +22,133 @@ export class BaseService<T extends DocumentData> {
     this.collectionName = collectionName;
   }
 
-  async create(id: string, data: WithFieldValue<T>): Promise<void> {
-    const docRef = doc(db, this.collectionName, id);
+  // =========================================================
+  // CREATE
+  // =========================================================
+
+  async create(
+    id: string,
+    data: WithFieldValue<T>
+  ): Promise<void> {
+    const docRef = doc(
+      db,
+      this.collectionName,
+      id
+    );
+
     await setDoc(docRef, data);
   }
 
-  async get(id: string): Promise<T | null> {
-    const docRef = doc(db, this.collectionName, id);
+  // =========================================================
+  // GET
+  // =========================================================
+
+  async get(
+    id: string
+  ): Promise<T | null> {
+    const docRef = doc(
+      db,
+      this.collectionName,
+      id
+    );
+
     const docSnap = await getDoc(docRef);
-    return docSnap.exists() ? (docSnap.data() as T) : null;
+
+    if (!docSnap.exists()) {
+      return null;
+    }
+
+    return {
+      id: docSnap.id,
+      ...docSnap.data(),
+    } as T;
   }
 
-  async update(id: string, data: UpdateData<T>): Promise<void> {
-    const docRef = doc(db, this.collectionName, id);
+  // =========================================================
+  // UPDATE
+  // =========================================================
+
+  async update(
+    id: string,
+    data: UpdateData<T>
+  ): Promise<void> {
+    const docRef = doc(
+      db,
+      this.collectionName,
+      id
+    );
+
     await updateDoc(docRef, data);
   }
 
-  async delete(id: string): Promise<void> {
-    const docRef = doc(db, this.collectionName, id);
+  // =========================================================
+  // DELETE
+  // =========================================================
+
+  async delete(
+    id: string
+  ): Promise<void> {
+    const docRef = doc(
+      db,
+      this.collectionName,
+      id
+    );
+
     await deleteDoc(docRef);
   }
 
-  async list(constraints: QueryConstraint[] = []): Promise<T[]> {
-    const colRef = collection(db, this.collectionName);
-    const q = query(colRef, ...constraints);
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+  // =========================================================
+  // LIST
+  // =========================================================
+
+  async list(
+    constraints: QueryConstraint[] = []
+  ): Promise<T[]> {
+    try {
+      console.log(
+        "Running Firestore query..."
+      );
+
+      const colRef = collection(
+        db,
+        this.collectionName
+      );
+
+      const q = query(
+        colRef,
+        ...constraints
+      );
+
+      const querySnapshot =
+        await getDocs(q);
+
+      console.log(
+        "Documents found:",
+        querySnapshot.size
+      );
+
+      const result =
+        querySnapshot.docs.map(
+          (document) =>
+            ({
+              id: document.id,
+              ...document.data(),
+            } as T)
+        );
+
+      console.log(
+        "Result:",
+        result
+      );
+
+      return result;
+    } catch (error) {
+      console.error(
+        "Firestore query failed:",
+        error
+      );
+
+      throw error;
+    }
   }
 }

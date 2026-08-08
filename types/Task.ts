@@ -1,11 +1,29 @@
-import { FieldValue } from "firebase/firestore";
+import { Timestamp } from "firebase/firestore";
+
+export type Priority = "low" | "medium" | "high";
 
 export interface Task {
   id: string;
+
   userId: string;
+
   title: string;
-  description: string;
-  status: "todo" | "in-progress" | "completed";
-  dueDate: FieldValue | null;
-  createdAt: FieldValue;
+
+  description?: string;
+
+  subject: string;
+
+  priority: Priority;
+
+  completed: boolean;
+
+  dueDate?: Timestamp;
+
+  createdAt: Timestamp;
+
+  completedAt?: Timestamp;
+
+  color?: string;
+
+  estimatedMinutes?: number;
 }
