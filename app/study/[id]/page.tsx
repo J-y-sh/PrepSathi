@@ -120,7 +120,11 @@ export default function StudyViewerPage() {
             resourceId: data.id,
             resourceTitle: data.title,
             resourceType: data.type,
+            resourceUrl: data.url,
             category: data.category,
+            progress: 0,
+            completed: false,
+            durationMinutes: 0,
           });
 
           console.log(
@@ -308,6 +312,7 @@ export default function StudyViewerPage() {
               <YouTubePlayer
                 url={resource.url}
                 title={resource.title}
+                resourceId={resource.id}
               />
             </div>
           </div>

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { serverTimestamp } from "firebase/firestore";
+import { serverTimestamp, Timestamp } from "firebase/firestore";
 
 import { Task } from "@/types/Task";
 import { taskService } from "@/services/firestore/taskService";
@@ -23,69 +23,191 @@ interface TaskStore {
     >
   ): Promise<void>;
 
-  toggleComplete(id: string, completed: boolean): Promise<void>;
+  updateTask(
+    id: string,
+    updates: Partial<
+      Pick<
+        Task,
+        | "title"
+        | "description"
+        | "subject"
+        | "priority"
+        | "dueDate"
+        | "color"
+        | "estimatedMinutes"
+      >
+    >
+  ): Promise<void>;
 
-  deleteTask(id: string): Promise<void>;
+  toggleComplete(
+    id: string,
+    completed: boolean
+  ): Promise<void>;
+
+  toggleTaskStatus(
+    id: string
+  ): Promise<void>;
+
+  deleteTask(
+    id: string
+  ): Promise<void>;
 }
 
-export const useTaskStore = create<TaskStore>((set, get) => ({
-  tasks: [],
+export const useTaskStore =
+  create<TaskStore>((set, get) => ({
+    tasks: [],
 
-  loading: false,
+    loading: false,
 
-  error: null,
+    error: null,
 
-  fetchTasks: async (userId) => {
-    set({ loading: true });
+    // =======================================================
+    // FETCH TASKS
+    // =======================================================
 
-    try {
-      const tasks = await taskService.listByUser(userId);
-
+    fetchTasks: async (userId) => {
       set({
-        tasks,
-        loading: false,
+        loading: true,
+        error: null,
       });
-    } catch (e: any) {
-      set({
-        loading: false,
-        error: e.message,
+
+      try {
+        const tasks =
+          await taskService.listByUser(userId);
+
+        set({
+          tasks,
+          loading: false,
+        });
+      } catch (e: any) {
+        console.error(
+          "TaskStore: failed to fetch tasks:",
+          e
+        );
+
+        set({
+          loading: false,
+          error:
+            e?.message ||
+            "Failed to load tasks.",
+        });
+      }
+    },
+
+    // =======================================================
+    // ADD TASK
+    // =======================================================
+
+    addTask: async (userId, task) => {
+      const id =
+        crypto.randomUUID();
+
+      await taskService.create(id, {
+        ...task,
+        userId,
+        completed: false,
+        createdAt: serverTimestamp(),
       });
-    }
-  },
 
-  addTask: async (userId, task) => {
-    const id = crypto.randomUUID();
+      await get().fetchTasks(userId);
+    },
 
-    await taskService.create(id, {
-      ...task,
-      userId,
-      completed: false,
-      createdAt: serverTimestamp(),
-    } as any);
+    // =======================================================
+    // UPDATE TASK
+    // =======================================================
 
-    await get().fetchTasks(userId);
-  },
+    updateTask: async (
+      id,
+      updates
+    ) => {
+      await taskService.update(
+        id,
+        updates
+      );
 
-  toggleComplete: async (id, completed) => {
-    await taskService.markCompleted(id, !completed);
+      set((state) => ({
+        tasks: state.tasks.map(
+          (task) =>
+            task.id === id
+              ? {
+                  ...task,
+                  ...updates,
+                }
+              : task
+        ),
+      }));
+    },
 
-    set((state) => ({
-      tasks: state.tasks.map((task) =>
-        task.id === id
-          ? {
-              ...task,
-              completed: !completed,
-            }
-          : task
-      ),
-    }));
-  },
+    // =======================================================
+    // TOGGLE COMPLETE
+    // =======================================================
 
-  deleteTask: async (id) => {
-    await taskService.delete(id);
+    toggleComplete: async (
+      id,
+      completed
+    ) => {
+      const nextCompleted =
+        !completed;
 
-    set((state) => ({
-      tasks: state.tasks.filter((t) => t.id !== id),
-    }));
-  },
-}));
+      await taskService.markCompleted(
+        id,
+        nextCompleted
+      );
+
+      set((state) => ({
+        tasks: state.tasks.map(
+          (task) =>
+            task.id === id
+              ? {
+                  ...task,
+                  completed:
+                    nextCompleted,
+                  completedAt:
+                    nextCompleted
+                      ? Timestamp.now()
+                      : undefined,
+                }
+              : task
+        ),
+      }));
+    },
+
+    // =======================================================
+    // TOGGLE TASK STATUS
+    // =======================================================
+
+    toggleTaskStatus: async (
+      id
+    ) => {
+      const task =
+        get().tasks.find(
+          (item) =>
+            item.id === id
+        );
+
+      if (!task) return;
+
+      await get().toggleComplete(
+        id,
+        task.completed
+      );
+    },
+
+    // =======================================================
+    // DELETE TASK
+    // =======================================================
+
+    deleteTask: async (
+      id
+    ) => {
+      await taskService.delete(id);
+
+      set((state) => ({
+        tasks:
+          state.tasks.filter(
+            (task) =>
+              task.id !== id
+          ),
+      }));
+    },
+  }));

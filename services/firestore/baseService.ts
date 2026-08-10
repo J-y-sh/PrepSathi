@@ -15,7 +15,7 @@ import {
 
 import { db } from "@/firebase/firebase";
 
-export class BaseService<T extends DocumentData> {
+export class BaseService<T extends DocumentData = DocumentData> {
   protected collectionName: string;
 
   constructor(collectionName: string) {
@@ -28,7 +28,7 @@ export class BaseService<T extends DocumentData> {
 
   async create(
     id: string,
-    data: WithFieldValue<T>
+    data: WithFieldValue<Omit<T, "id">>
   ): Promise<void> {
     const docRef = doc(
       db,
@@ -61,7 +61,7 @@ export class BaseService<T extends DocumentData> {
     return {
       id: docSnap.id,
       ...docSnap.data(),
-    } as T;
+    } as unknown as T;
   }
 
   // =========================================================
@@ -133,7 +133,7 @@ export class BaseService<T extends DocumentData> {
             ({
               id: document.id,
               ...document.data(),
-            } as T)
+            } as unknown as T)
         );
 
       console.log(

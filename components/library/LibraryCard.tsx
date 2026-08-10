@@ -9,15 +9,20 @@ import {
   Star,
   ExternalLink,
   Trash2,
+  CheckCircle2,
+  Loader2,
 } from "lucide-react";
 
 import { LibraryResource } from "@/types/Library";
+import { PlaylistProgress } from "@/types/PlaylistProgress";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 interface LibraryCardProps {
   resource: LibraryResource;
   isGrid?: boolean;
+  playlistProgress?: PlaylistProgress | null;
+  playlistProgressLoading?: boolean;
   onFavorite: (id: string, current: boolean) => void;
   onDelete: (id: string) => void;
   onOpen: (id: string) => void;
@@ -27,6 +32,8 @@ interface LibraryCardProps {
 export function LibraryCard({
   resource,
   isGrid = true,
+  playlistProgress = null,
+  playlistProgressLoading = false,
   onFavorite,
   onDelete,
   onOpen,
@@ -36,15 +43,22 @@ export function LibraryCard({
     resource.type === "pdf"
       ? FileText
       : resource.type === "youtube"
-        ? Play
-        : LinkIcon;
+      ? Play
+      : LinkIcon;
 
   const colorClass =
     resource.type === "pdf"
       ? "text-red-400"
       : resource.type === "youtube"
-        ? "text-red-500"
-        : "text-blue-400";
+      ? "text-red-500"
+      : "text-blue-400";
+
+  const hasPlaylistProgress =
+    resource.type === "youtube" &&
+    playlistProgress !== null;
+
+  const progressPercentage =
+    playlistProgress?.percentage ?? 0;
 
   return (
     <motion.div
@@ -58,20 +72,31 @@ export function LibraryCard({
           : "p-4 flex items-center gap-4"
       )}
     >
-      {/* Top section */}
+      {/* =====================================================
+          TOP SECTION
+      ====================================================== */}
+
       <div
         className={cn(
           "flex items-center justify-between",
           !isGrid && "hidden"
         )}
       >
-        <div className={cn("p-2 rounded-lg bg-white/5", colorClass)}>
-          <Icon size={24} />
+        <div
+          className={cn(
+            "p-2 rounded-lg bg-white/5",
+            colorClass
+          )}
+        >
+          <Icon size={20} />
         </div>
 
         <button
           onClick={() =>
-            onFavorite(resource.id, resource.isFavorite)
+            onFavorite(
+              resource.id,
+              resource.isFavorite
+            )
           }
           className={cn(
             "p-2 rounded-full transition-colors",
@@ -82,12 +107,19 @@ export function LibraryCard({
         >
           <Star
             size={18}
-            fill={resource.isFavorite ? "currentColor" : "none"}
+            fill={
+              resource.isFavorite
+                ? "currentColor"
+                : "none"
+            }
           />
         </button>
       </div>
 
-      {/* Resource information */}
+      {/* =====================================================
+          RESOURCE INFORMATION
+      ====================================================== */}
+
       <div className="flex-1 min-w-0">
         {!isGrid && (
           <div
@@ -107,9 +139,100 @@ export function LibraryCard({
         <p className="text-white/40 text-xs mt-1 truncate">
           {resource.category}
         </p>
+
+        {/* ===================================================
+            PLAYLIST PROGRESS
+        ==================================================== */}
+
+        {resource.type === "youtube" && (
+          <div className="mt-3">
+
+            {playlistProgressLoading &&
+            !playlistProgress ? (
+              <div className="flex items-center gap-2 text-[10px] text-white/30">
+                <Loader2
+                  size={12}
+                  className="animate-spin"
+                />
+                Loading progress...
+              </div>
+            ) : hasPlaylistProgress ? (
+              <div className="space-y-1.5">
+
+                <div className="flex items-center justify-between">
+
+                  <span className="text-[10px] text-white/40">
+                    {playlistProgress.completedVideos}{" "}
+                    /{" "}
+                    {playlistProgress.totalVideos}{" "}
+                    videos
+                  </span>
+
+                  <span
+                    className={cn(
+                      "text-[10px] font-bold",
+                      progressPercentage >= 100
+                        ? "text-emerald-400"
+                        : "text-amber-400"
+                    )}
+                  >
+                    {progressPercentage}%
+                  </span>
+
+                </div>
+
+                <div className="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all duration-500",
+                      progressPercentage >= 100
+                        ? "bg-emerald-400"
+                        : "bg-amber-400"
+                    )}
+                    style={{
+                      width: `${Math.min(
+                        progressPercentage,
+                        100
+                      )}%`,
+                    }}
+                  />
+
+                </div>
+
+                {playlistProgress.completedVideos >
+                  0 &&
+                  playlistProgress.completedVideos <
+                    playlistProgress.totalVideos && (
+                    <p className="text-[9px] text-white/25">
+                      Keep going — playlist in progress
+                    </p>
+                  )}
+
+                {playlistProgress.completedVideos ===
+                  playlistProgress.totalVideos &&
+                  playlistProgress.totalVideos > 0 && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-emerald-400">
+                      <CheckCircle2 size={11} />
+                      Playlist completed
+                    </div>
+                  )}
+
+              </div>
+            ) : (
+              <div className="text-[10px] text-white/25">
+                No progress yet
+              </div>
+            )}
+
+          </div>
+        )}
       </div>
 
-      {/* Actions */}
+      {/* =====================================================
+          ACTIONS
+      ====================================================== */}
+
       <div
         className={cn(
           "flex items-center justify-between",
@@ -117,41 +240,57 @@ export function LibraryCard({
         )}
       >
         <div className="flex items-center gap-2">
-          {/* Open */}
+
+          {/* OPEN */}
+
           <a
             href={resource.url}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => onOpen(resource.id)}
+            onClick={() =>
+              onOpen(resource.id)
+            }
             className="flex items-center gap-2 text-xs font-bold text-amber-500 uppercase tracking-widest hover:text-amber-400 transition-colors"
           >
             Open
             <ExternalLink size={12} />
           </a>
 
-          {/* Start Study */}
+          {/* START STUDY */}
+
           <Button
             size="sm"
-            onClick={() => onStartStudy(resource)}
+            onClick={() =>
+              onStartStudy(resource)
+            }
             className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg"
           >
+            <Play size={14} />
             Start Study
           </Button>
+
         </div>
 
-        {/* Delete */}
+        {/* DELETE */}
+
         <button
-          onClick={() => onDelete(resource.id)}
+          onClick={() =>
+            onDelete(resource.id)
+          }
           className="p-2 rounded-lg hover:bg-destructive/10 text-destructive/40 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
         >
           <Trash2 size={16} />
         </button>
 
-        {/* Favorite for list view */}
+        {/* FAVORITE FOR LIST VIEW */}
+
         {!isGrid && (
           <button
             onClick={() =>
-              onFavorite(resource.id, resource.isFavorite)
+              onFavorite(
+                resource.id,
+                resource.isFavorite
+              )
             }
             className={cn(
               "p-2 rounded-full transition-colors",
@@ -162,10 +301,15 @@ export function LibraryCard({
           >
             <Star
               size={18}
-              fill={resource.isFavorite ? "currentColor" : "none"}
+              fill={
+                resource.isFavorite
+                  ? "currentColor"
+                  : "none"
+              }
             />
           </button>
         )}
+
       </div>
     </motion.div>
   );

@@ -23,6 +23,8 @@ import { Button } from "@/components/ui/button";
 
 import { cn } from "@/lib/utils";
 import { LibraryResource } from "@/types/Library";
+import { PlaylistProgress } from "@/types/PlaylistProgress";
+import { playlistProgressService } from "@/services/firestore/playlistProgressService";
 
 const CATEGORIES = [
   "All",
@@ -59,6 +61,12 @@ export function LibraryMode() {
   const [showOnlyFavorites, setShowOnlyFavorites] =
     useState(false);
 
+  const [playlistProgress, setPlaylistProgress] =
+    useState<Record<string, PlaylistProgress>>({});
+
+  const [loadingPlaylistProgress, setLoadingPlaylistProgress] =
+    useState(false);
+
   // =========================================================
   // FETCH USER LIBRARY
   // =========================================================
@@ -73,6 +81,119 @@ export function LibraryMode() {
 
     fetchResources(user.uid);
   }, [user, fetchResources]);
+
+  // =========================================================
+  // LOAD PLAYLIST PROGRESS
+  // =========================================================
+
+  useEffect(() => {
+    if (!user || resources.length === 0) {
+      setPlaylistProgress({});
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadPlaylistProgress = async () => {
+      const youtubeResources = resources.filter(
+        (resource) =>
+          resource.type === "youtube" &&
+          resource.url
+      );
+
+      if (youtubeResources.length === 0) {
+        setPlaylistProgress({});
+        return;
+      }
+
+      setLoadingPlaylistProgress(true);
+
+      const progressMap: Record<
+        string,
+        PlaylistProgress
+      > = {};
+
+      try {
+        await Promise.all(
+          youtubeResources.map(async (resource) => {
+            try {
+              const parsedUrl = new URL(resource.url);
+
+              const playlistId =
+                parsedUrl.searchParams.get("list");
+
+              if (!playlistId || !resource.id) {
+                return;
+              }
+
+              /*
+               * We need the playlist's actual video count.
+               *
+               * The playlist metadata endpoint used by
+               * YouTubePlayer is reused here so LibraryMode
+               * doesn't need to know anything about the
+               * YouTube API implementation.
+               */
+              const response = await fetch(
+                `/api/youtube/playlist?playlistId=${encodeURIComponent(
+                  playlistId
+                )}`
+              );
+
+              if (!response.ok) {
+                console.error(
+                  "[PlaylistProgress] Failed to load playlist metadata:",
+                  resource.title
+                );
+                return;
+              }
+
+              const data = await response.json();
+
+              const totalVideos =
+                data.totalResults ??
+                data.videos?.length ??
+                0;
+
+              if (totalVideos <= 0) {
+                return;
+              }
+
+              const progress =
+                await playlistProgressService.getPlaylistProgress(
+                  user.uid,
+                  resource.id,
+                  playlistId,
+                  totalVideos
+                );
+
+              progressMap[resource.id] = progress;
+            } catch (error) {
+              console.error(
+                "[PlaylistProgress] Failed for resource:",
+                resource.title,
+                error
+              );
+            }
+          })
+        );
+
+        if (!cancelled) {
+          setPlaylistProgress(progressMap);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingPlaylistProgress(false);
+        }
+      }
+    };
+
+    loadPlaylistProgress();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, resources]);
 
   // =========================================================
   // FILTER RESOURCES
@@ -130,7 +251,6 @@ export function LibraryMode() {
     try {
       let finalUrl = data.url;
 
-      // PDF → Cloudinary
       if (data.type === "pdf" && data.file) {
         finalUrl = await uploadFile(
           user.uid,
@@ -212,9 +332,7 @@ export function LibraryMode() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-4 space-y-8 pb-32">
 
-      {/* =====================================================
-          HEADER
-      ====================================================== */}
+      {/* HEADER */}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
 
@@ -284,9 +402,7 @@ export function LibraryMode() {
 
       </div>
 
-      {/* =====================================================
-          SEARCH + FAVORITES
-      ====================================================== */}
+      {/* SEARCH + FAVORITES */}
 
       <div className="flex flex-col md:flex-row gap-4">
 
@@ -336,9 +452,7 @@ export function LibraryMode() {
 
       </div>
 
-      {/* =====================================================
-          CATEGORY FILTERS
-      ====================================================== */}
+      {/* CATEGORY FILTERS */}
 
       <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
 
@@ -363,9 +477,7 @@ export function LibraryMode() {
 
       </div>
 
-      {/* =====================================================
-          RESOURCE GRID / LIST
-      ====================================================== */}
+      {/* RESOURCE GRID / LIST */}
 
       <div
         className={cn(
@@ -375,8 +487,6 @@ export function LibraryMode() {
             : "space-y-3"
         )}
       >
-
-        {/* LOADING */}
 
         {loading ? (
 
@@ -395,8 +505,6 @@ export function LibraryMode() {
 
         ) : filteredResources.length > 0 ? (
 
-          /* RESOURCES */
-
           <AnimatePresence mode="popLayout">
 
             {filteredResources.map(
@@ -406,6 +514,15 @@ export function LibraryMode() {
                   key={resource.id}
                   resource={resource}
                   isGrid={isGrid}
+                  playlistProgress={
+                    playlistProgress[
+                      resource.id
+                    ] ?? null
+                  }
+                  playlistProgressLoading={
+                    loadingPlaylistProgress &&
+                    resource.type === "youtube"
+                  }
                   onFavorite={toggleFavorite}
                   onDelete={deleteResource}
                   onOpen={() =>
@@ -422,8 +539,6 @@ export function LibraryMode() {
           </AnimatePresence>
 
         ) : (
-
-          /* EMPTY STATE */
 
           <div className="col-span-full flex flex-col items-center justify-center py-20 text-center space-y-4">
 
@@ -477,9 +592,7 @@ export function LibraryMode() {
 
       </div>
 
-      {/* =====================================================
-          UPLOAD DIALOG
-      ====================================================== */}
+      {/* UPLOAD DIALOG */}
 
       <UploadDialog
         isOpen={isUploadOpen}

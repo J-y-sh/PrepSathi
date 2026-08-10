@@ -2,14 +2,20 @@
 
 import React from "react";
 
-import { AppBar } from "@/components/dashboard/AppBar";
+import AnalyticsPage from "@/app/analytics/page";
+
 import { CountdownCard } from "@/components/dashboard/CountdownCard";
 import { SprintCard } from "@/components/dashboard/SprintCard";
 import { ProgressCard } from "@/components/dashboard/ProgressCard";
 import { DashboardCard } from "@/components/dashboard/DashboardCard";
+import { StudyOverviewCard } from "@/components/dashboard/StudyOverviewCard";
 import { DashboardLayout } from "./DashboardLayout";
 
-import { Newspaper, Layers, PenTool } from "lucide-react";
+import {
+  Newspaper,
+  Layers,
+  PenTool,
+} from "lucide-react";
 
 import { useNavStore } from "@/store/useNavStore";
 import { useStudySessionStore } from "@/store/useStudySessionStore";
@@ -22,9 +28,14 @@ import { StudyMode } from "@/features/study/StudyMode";
 import { useSyncUser } from "@/hooks/useSyncUser";
 
 export function DashboardPage() {
-  const { activeTab, setActiveTab } = useNavStore();
+  const {
+    activeTab,
+    setActiveTab,
+  } = useNavStore();
 
-  const { currentSession } = useStudySessionStore();
+  const {
+    currentSession,
+  } = useStudySessionStore();
 
   useSyncUser();
 
@@ -37,33 +48,30 @@ export function DashboardPage() {
    */
   if (currentSession) {
     return (
-      <DashboardLayout>
-        <StudyMode
-          onBack={() => {
-            setActiveTab("library");
-          }}
-        />
-      </DashboardLayout>
+      <StudyMode
+        onBack={() => {
+          setActiveTab("library");
+        }}
+      />
     );
   }
 
   return (
     <DashboardLayout>
-
       {activeTab === "dashboard" ? (
-
         <div className="px-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-          <UPSCCountdownCard />
+          <CountdownCard />
 
           <SprintCard />
 
           <ProgressCard />
 
+          <StudyOverviewCard />
+
           {/* Current Affairs */}
 
           <DashboardCard title="Current Affairs">
-
             <div className="flex items-center gap-4 py-2">
 
               <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-500">
@@ -75,13 +83,11 @@ export function DashboardPage() {
               </p>
 
             </div>
-
           </DashboardCard>
 
           {/* Flashcards */}
 
           <DashboardCard title="Flashcards Due">
-
             <div className="flex items-center gap-4 py-2">
 
               <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-500">
@@ -93,13 +99,11 @@ export function DashboardPage() {
               </p>
 
             </div>
-
           </DashboardCard>
 
           {/* Answer Writing */}
 
           <DashboardCard title="Daily Answer Writing">
-
             <div className="flex items-center gap-4 py-2">
 
               <div className="p-2.5 rounded-xl bg-[#10B981]/10 text-[#10B981]">
@@ -111,7 +115,6 @@ export function DashboardPage() {
               </p>
 
             </div>
-
           </DashboardCard>
 
         </div>
@@ -127,6 +130,10 @@ export function DashboardPage() {
       ) : activeTab === "library" ? (
 
         <LibraryMode />
+
+      ) : activeTab === "analytics" ? (
+
+        <AnalyticsPage />
 
       ) : (
 
@@ -145,12 +152,7 @@ export function DashboardPage() {
           </p>
 
         </div>
-
       )}
-
     </DashboardLayout>
   );
 }
-
-// Internal alias for cleaner structure.
-const UPSCCountdownCard = CountdownCard;
