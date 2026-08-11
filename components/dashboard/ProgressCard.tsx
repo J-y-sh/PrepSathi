@@ -9,6 +9,34 @@ import { studySessionService } from "@/services/firestore/studySessionService";
 import { StudySession } from "@/types/StudySession";
 import { useStudySessionStore } from "@/store/useStudySessionStore";
 
+const DAILY_TARGET_HOURS = 8;
+
+function getSessionDate(
+  value: StudySession["createdAt"]
+): Date | null {
+  if (
+    value &&
+    typeof value === "object" &&
+    "toDate" in value &&
+    typeof value.toDate === "function"
+  ) {
+    return value.toDate();
+  }
+
+  return null;
+}
+
+function isSameDay(
+  date: Date,
+  target: Date
+): boolean {
+  return (
+    date.getFullYear() === target.getFullYear() &&
+    date.getMonth() === target.getMonth() &&
+    date.getDate() === target.getDate()
+  );
+}
+
 export function ProgressCard() {
   const { user } = useAuth();
 
@@ -20,8 +48,6 @@ export function ProgressCard() {
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const target = 8;
-
   useEffect(() => {
     if (!user) {
       setSessions([]);
@@ -31,9 +57,11 @@ export function ProgressCard() {
 
     let cancelled = false;
 
-    const loadProgress = async () => {
+    async function loadProgress() {
       try {
         setLoading(true);
+
+        if (!user) return;
 
         const data =
           await studySessionService.listByUser(
@@ -53,7 +81,7 @@ export function ProgressCard() {
           setLoading(false);
         }
       }
-    };
+    }
 
     loadProgress();
 
@@ -62,55 +90,41 @@ export function ProgressCard() {
     };
   }, [user]);
 
-  const progress = useMemo(() => {
+  const completedHours = useMemo(() => {
     const today = new Date();
 
-    const historicalMinutes =
-      sessions.reduce(
-        (sum, session) => {
-          const createdAt =
-            session.createdAt;
+    const completedMinutes =
+      sessions.reduce((total, session) => {
+        if (!session.completed) {
+          return total;
+        }
 
-          if (
-            !createdAt ||
-            typeof createdAt !== "object" ||
-            !("toDate" in createdAt)
-          ) {
-            return sum;
-          }
+        const date = getSessionDate(
+          session.createdAt
+        );
 
-          const sessionDate =
-            createdAt.toDate();
+        if (!date || !isSameDay(date, today)) {
+          return total;
+        }
 
-          const isToday =
-            sessionDate.getFullYear() ===
-              today.getFullYear() &&
-            sessionDate.getMonth() ===
-              today.getMonth() &&
-            sessionDate.getDate() ===
-              today.getDate();
+        return total + (session.durationMinutes || 0);
+      }, 0);
 
-          if (!isToday) {
-            return sum;
-          }
-
-          return (
-            sum +
-            (session.durationMinutes || 0)
-          );
-        },
-        0
-      );
-
-    const activeSessionMinutes =
-      currentSession
+    /*
+     * Add the currently active session visually.
+     *
+     * This does not get persisted until the session finishes,
+     * so the dashboard remains responsive during live study.
+     */
+    const activeMinutes =
+      currentSession && elapsedSeconds > 0
         ? elapsedSeconds / 60
         : 0;
 
     return (
-      historicalMinutes +
-      activeSessionMinutes
-    ) / 60;
+      completedMinutes / 60 +
+      activeMinutes / 60
+    );
   }, [
     sessions,
     currentSession,
@@ -118,7 +132,7 @@ export function ProgressCard() {
   ]);
 
   const percentage = Math.min(
-    (progress / target) * 100,
+    (completedHours / DAILY_TARGET_HOURS) * 100,
     100
   );
 
@@ -139,30 +153,30 @@ export function ProgressCard() {
 
               <div>
                 <p className="text-2xl font-bold text-white">
-                  {progress.toFixed(1)}h
+                  {completedHours.toFixed(1)}h
                 </p>
 
                 <p className="text-[10px] uppercase tracking-wider text-white/30">
-                  Completed
+                  Studied Today
                 </p>
               </div>
 
               <div className="text-right">
                 <p className="text-2xl font-bold text-white">
-                  {target}h
+                  {DAILY_TARGET_HOURS}h
                 </p>
 
                 <p className="text-[10px] uppercase tracking-wider text-white/30">
-                  Target
+                  Daily Target
                 </p>
               </div>
 
             </div>
 
-            <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden p-0.5">
+            <div className="h-3 w-full overflow-hidden rounded-full bg-white/5 p-0.5">
 
               <div
-                className="h-full bg-[#10B981] rounded-full transition-all duration-1000"
+                className="h-full rounded-full bg-[#10B981] transition-all duration-1000"
                 style={{
                   width: `${percentage}%`,
                 }}
@@ -172,8 +186,10 @@ export function ProgressCard() {
 
             <div className="flex items-center justify-between">
 
-              <p className="text-[10px] text-white/30 italic">
-                Consistency is the key to UPSC success.
+              <p className="text-[10px] italic text-white/30">
+                {completedHours >= DAILY_TARGET_HOURS
+                  ? "Daily target achieved. Excellent work."
+                  : "Consistency is the key to UPSC success."}
               </p>
 
               <p className="text-[10px] font-semibold text-emerald-400">

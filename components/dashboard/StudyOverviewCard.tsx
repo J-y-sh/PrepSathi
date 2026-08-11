@@ -1,17 +1,23 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, {
+  useEffect,
+  useState,
+} from "react";
+
 import {
   Clock3,
   CalendarDays,
   Target,
   Flame,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 
 import { useAuth } from "@/features/auth/AuthProvider";
 import { studySessionService } from "@/services/firestore/studySessionService";
 import { StudySession } from "@/types/StudySession";
+import { useNavStore } from "@/store/useNavStore";
 
 interface StudyOverview {
   todayMinutes: number;
@@ -20,24 +26,40 @@ interface StudyOverview {
   streak: number;
 }
 
+const EMPTY_OVERVIEW: StudyOverview = {
+  todayMinutes: 0,
+  weekMinutes: 0,
+  completedSessions: 0,
+  streak: 0,
+};
+
 export function StudyOverviewCard() {
   const { user } = useAuth();
+  const { setActiveTab } = useNavStore();
 
   const [overview, setOverview] =
-    useState<StudyOverview>({
-      todayMinutes: 0,
-      weekMinutes: 0,
-      completedSessions: 0,
-      streak: 0,
-    });
+    useState<StudyOverview>(
+      EMPTY_OVERVIEW
+    );
+
+  const [loading, setLoading] =
+    useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setOverview(EMPTY_OVERVIEW);
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
 
-    const loadOverview = async () => {
+    async function loadOverview() {
       try {
+        setLoading(true);
+
+        if (!user) return;
+
         const sessions =
           await studySessionService.listByUser(
             user.uid
@@ -53,8 +75,12 @@ export function StudyOverviewCard() {
           "StudyOverviewCard: failed to load:",
           error
         );
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    };
+    }
 
     loadOverview();
 
@@ -66,12 +92,17 @@ export function StudyOverviewCard() {
   const formatStudyTime = (
     totalMinutes: number
   ) => {
+    const safeMinutes = Math.max(
+      0,
+      Math.round(totalMinutes)
+    );
+
     const hours = Math.floor(
-      totalMinutes / 60
+      safeMinutes / 60
     );
 
     const minutes =
-      totalMinutes % 60;
+      safeMinutes % 60;
 
     if (hours === 0) {
       return `${minutes}m`;
@@ -85,83 +116,83 @@ export function StudyOverviewCard() {
   };
 
   return (
-    <div className="bg-[#1E293B] border border-white/5 rounded-2xl p-5">
+    <div className="rounded-2xl border border-white/5 bg-[#1E293B] p-5">
 
-      <div className="flex items-start justify-between mb-5">
+      <div className="mb-5 flex items-start justify-between">
 
         <div>
-          <p className="text-xs text-amber-500 uppercase tracking-widest font-bold">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-500">
             Study Overview
           </p>
 
-          <h2 className="text-lg font-bold text-white mt-1">
+          <h2 className="mt-1 text-lg font-bold text-white">
             Your Progress
           </h2>
         </div>
 
-        <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
+        <div className="rounded-xl bg-amber-500/10 p-2.5 text-amber-500">
           <Target size={20} />
         </div>
 
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      {loading ? (
+        <div className="flex items-center justify-center py-10">
+          <Loader2
+            size={22}
+            className="animate-spin text-amber-500"
+          />
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3">
 
-        <OverviewItem
-          icon={<Clock3 size={16} />}
-          label="Today"
-          value={formatStudyTime(
-            overview.todayMinutes
-          )}
-        />
+            <OverviewItem
+              icon={<Clock3 size={16} />}
+              label="Today"
+              value={formatStudyTime(
+                overview.todayMinutes
+              )}
+            />
 
-        <OverviewItem
-          icon={<CalendarDays size={16} />}
-          label="This Week"
-          value={formatStudyTime(
-            overview.weekMinutes
-          )}
-        />
+            <OverviewItem
+              icon={<CalendarDays size={16} />}
+              label="This Week"
+              value={formatStudyTime(
+                overview.weekMinutes
+              )}
+            />
 
-        <OverviewItem
-          icon={<Target size={16} />}
-          label="Completed"
-          value={String(
-            overview.completedSessions
-          )}
-        />
+            <OverviewItem
+              icon={<Target size={16} />}
+              label="Sessions"
+              value={String(
+                overview.completedSessions
+              )}
+            />
 
-        <OverviewItem
-          icon={<Flame size={16} />}
-          label="Streak"
-          value={`${overview.streak} ${
-            overview.streak === 1
-              ? "day"
-              : "days"
-          }`}
-        />
+            <OverviewItem
+              icon={<Flame size={16} />}
+              label="Streak"
+              value={`${overview.streak} ${
+                overview.streak === 1
+                  ? "day"
+                  : "days"
+              }`}
+            />
 
-      </div>
+          </div>
 
-      <button
-        onClick={() => {
-          window.dispatchEvent(
-            new CustomEvent(
-              "prepsathi:navigate",
-              {
-                detail: {
-                  tab: "analytics",
-                },
-              }
-            )
-          );
-        }}
-        className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/[0.03] border border-white/5 text-white/60 hover:text-white hover:bg-white/[0.06] transition-all text-sm font-medium"
-      >
-        View Analytics
-
-        <ArrowRight size={16} />
-      </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("analytics")}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/5 bg-white/[0.03] py-2.5 text-sm font-medium text-white/60 transition-all hover:bg-white/[0.06] hover:text-white"
+          >
+            View Analytics
+            <ArrowRight size={16} />
+          </button>
+        </>
+      )}
 
     </div>
   );
@@ -177,7 +208,7 @@ function OverviewItem({
   value: string;
 }) {
   return (
-    <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3">
+    <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
 
       <div className="flex items-center gap-2 text-white/30">
         {icon}
@@ -187,7 +218,7 @@ function OverviewItem({
         </span>
       </div>
 
-      <p className="text-lg font-bold text-white mt-2">
+      <p className="mt-2 text-lg font-bold text-white">
         {value}
       </p>
 
@@ -198,81 +229,83 @@ function OverviewItem({
 function calculateOverview(
   sessions: StudySession[]
 ): StudyOverview {
-  const today = new Date();
+  const now = new Date();
 
-  const startOfToday = new Date(today);
-  startOfToday.setHours(0, 0, 0, 0);
-
-  const weekStart = new Date(today);
-  weekStart.setHours(0, 0, 0, 0);
-  weekStart.setDate(
-    today.getDate() - today.getDay()
-  );
-
-  const todayMinutes = sessions.reduce(
-    (sum, session) => {
-      const date = getSessionDate(
-        session.createdAt
-      );
-
-      if (!date) return sum;
-
-      return date >= startOfToday
-        ? sum + (session.durationMinutes || 0)
-        : sum;
-    },
+  const startOfToday = new Date(now);
+  startOfToday.setHours(
+    0,
+    0,
+    0,
     0
   );
 
-  const weekMinutes = sessions.reduce(
-    (sum, session) => {
-      const date = getSessionDate(
-        session.createdAt
-      );
-
-      if (!date) return sum;
-
-      return date >= weekStart
-        ? sum + (session.durationMinutes || 0)
-        : sum;
-    },
+  const startOfWeek = new Date(now);
+  startOfWeek.setHours(
+    0,
+    0,
+    0,
     0
+  );
+
+  /*
+   * Sunday = 0.
+   *
+   * This keeps the existing weekly definition used
+   * throughout the current dashboard.
+   */
+  startOfWeek.setDate(
+    startOfWeek.getDate() -
+      startOfWeek.getDay()
   );
 
   const completedSessions =
     sessions.filter(
       (session) => session.completed
-    ).length;
+    );
 
-  const studyDays = new Set(
-    sessions
-      .filter(
-        (session) => session.completed
-      )
-      .map((session) => {
-        const date = getSessionDate(
-          session.createdAt
-        );
+  let todayMinutes = 0;
+  let weekMinutes = 0;
 
-        if (!date) return null;
+  const studyDays = new Set<string>();
 
-        return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-      })
-      .filter(Boolean)
-  );
+  for (const session of completedSessions) {
+    const date = getSessionDate(
+      session.createdAt
+    );
 
-  let streak = 0;
+    if (!date) continue;
 
-  const streakDate = new Date();
-  streakDate.setHours(0, 0, 0, 0);
+    const minutes =
+      session.durationMinutes || 0;
 
-  while (true) {
-    const key = `${streakDate.getFullYear()}-${streakDate.getMonth()}-${streakDate.getDate()}`;
-
-    if (!studyDays.has(key)) {
-      break;
+    if (date >= startOfToday) {
+      todayMinutes += minutes;
     }
 
+    if (date >= startOfWeek) {
+      weekMinutes += minutes;
+    }
+
+    studyDays.add(
+      getDateKey(date)
+    );
+  }
+
+  /*
+   * Calculate consecutive completed-study days
+   * backwards from today.
+   */
+  let streak = 0;
+
+  const streakDate = new Date(
+    startOfToday
+  );
+
+  while (
+    studyDays.has(
+      getDateKey(streakDate)
+    )
+  ) {
     streak++;
 
     streakDate.setDate(
@@ -283,7 +316,8 @@ function calculateOverview(
   return {
     todayMinutes,
     weekMinutes,
-    completedSessions,
+    completedSessions:
+      completedSessions.length,
     streak,
   };
 }
@@ -301,4 +335,14 @@ function getSessionDate(
   }
 
   return null;
+}
+
+function getDateKey(
+  date: Date
+): string {
+  return [
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  ].join("-");
 }

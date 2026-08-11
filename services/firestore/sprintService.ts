@@ -1,16 +1,26 @@
-import { serverTimestamp } from "firebase/firestore";
+import {
+  increment,
+  serverTimestamp,
+} from "firebase/firestore";
+
 import { Sprint } from "@/types/Sprint";
 import { BaseService } from "./baseService";
 import { userService } from "./userService";
-import { increment } from "firebase/firestore";
 
 class SprintService extends BaseService<Sprint> {
   constructor() {
     super("sprints");
   }
 
-  async completeSprint(userId: string, sprintData: Omit<Sprint, "id" | "userId" | "completedAt" | "status">): Promise<void> {
+  async completeSprint(
+    userId: string,
+    sprintData: Omit<
+      Sprint,
+      "id" | "userId" | "completedAt" | "status"
+    >
+  ): Promise<void> {
     const sprintId = crypto.randomUUID();
+
     const sprint: Sprint = {
       ...sprintData,
       id: sprintId,
@@ -19,16 +29,42 @@ class SprintService extends BaseService<Sprint> {
       completedAt: serverTimestamp(),
     };
 
-    // Save the sprint record
-    await this.create(sprintId, sprint);
+    /*
+     * Save the completed sprint.
+     */
+    await this.create(
+      sprintId,
+      sprint
+    );
 
-    // Update user stats
-    const hoursEarned = sprintData.durationMinutes / 60;
-    await userService.update(userId, {
-      xp: increment(sprintData.xpAwarded),
-      todayStudyHours: increment(hoursEarned),
-    } as any);
+    /*
+     * Update user-level gamification/study stats.
+     *
+     * durationMinutes is the actual focused duration
+     * calculated by SprintMode.
+     */
+    const hoursEarned =
+      Math.max(
+        0,
+        sprintData.durationMinutes
+      ) / 60;
+
+    await userService.update(
+      userId,
+      {
+        xp: increment(
+          Math.max(
+            0,
+            sprintData.xpAwarded
+          )
+        ),
+
+        todayStudyHours:
+          increment(hoursEarned),
+      } as any
+    );
   }
 }
 
-export const sprintService = new SprintService();
+export const sprintService =
+  new SprintService();

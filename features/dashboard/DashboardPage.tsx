@@ -3,6 +3,7 @@
 import React from "react";
 
 import AnalyticsPage from "@/app/analytics/page";
+import SyllabusPage from "@/features/syllabus/SyllabusPage";
 
 import { CountdownCard } from "@/components/dashboard/CountdownCard";
 import { SprintCard } from "@/components/dashboard/SprintCard";
@@ -126,6 +127,10 @@ export function DashboardPage() {
       ) : activeTab === "planner" ? (
 
         <PlannerMode />
+
+      ) : activeTab === "syllabus" ? (
+
+        <SyllabusPage />
 
       ) : activeTab === "library" ? (
 
