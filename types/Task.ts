@@ -2,6 +2,8 @@ import { Timestamp } from "firebase/firestore";
 
 export type Priority = "low" | "medium" | "high";
 
+export type TaskStage = "prelims" | "mains";
+
 export interface Task {
   id: string;
 
@@ -12,6 +14,10 @@ export interface Task {
   description?: string;
 
   subject: string;
+
+  topicId?: string;
+
+  stage?: TaskStage;
 
   priority: Priority;
 

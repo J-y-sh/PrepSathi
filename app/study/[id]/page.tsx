@@ -35,7 +35,9 @@ export default function StudyViewerPage() {
   // =========================================================
 
   useEffect(() => {
-    if (!user || !params.id) return;
+    if (!user || !params.id) {
+      return;
+    }
 
     let cancelled = false;
 
@@ -52,7 +54,7 @@ export default function StudyViewerPage() {
         );
 
         // -----------------------------------------------------
-        // GET RESOURCE FROM FIRESTORE
+        // GET RESOURCE
         // -----------------------------------------------------
 
         const data =
@@ -86,7 +88,9 @@ export default function StudyViewerPage() {
           );
         }
 
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
 
         setResource(data);
 
@@ -105,7 +109,7 @@ export default function StudyViewerPage() {
           );
         } catch (markError) {
           console.error(
-            "Failed to mark resource as opened:",
+            "StudyViewer: failed to mark resource as opened:",
             markError
           );
         }
@@ -128,21 +132,22 @@ export default function StudyViewerPage() {
           });
 
           console.log(
-            "Study session started:",
+            "StudyViewer: study session started:",
             data.id
           );
         } catch (sessionError) {
+          /*
+           * Study-session tracking failure should never
+           * prevent the actual resource from opening.
+           */
           console.error(
-            "Failed to start study session:",
+            "StudyViewer: failed to start study session:",
             sessionError
           );
-
-          // Session tracking failure should NOT
-          // prevent the resource from opening.
         }
       } catch (err) {
         console.error(
-          "Failed to load study resource:",
+          "StudyViewer: failed to load resource:",
           err
         );
 
@@ -160,7 +165,7 @@ export default function StudyViewerPage() {
       }
     };
 
-    loadResource();
+    void loadResource();
 
     return () => {
       cancelled = true;
@@ -196,6 +201,10 @@ export default function StudyViewerPage() {
     return (
       <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center px-6">
         <div className="text-center max-w-md">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10 text-red-400">
+            <FileText size={24} />
+          </div>
+
           <h1 className="text-xl font-bold text-white mb-2">
             Unable to open resource
           </h1>
@@ -216,18 +225,27 @@ export default function StudyViewerPage() {
   }
 
   // =========================================================
+  // RESOURCE ICON
+  // =========================================================
+
+  const ResourceIcon =
+    resource.type === "pdf"
+      ? FileText
+      : resource.type === "youtube"
+      ? Play
+      : LinkIcon;
+
+  // =========================================================
   // RENDER
   // =========================================================
 
   return (
     <div className="h-screen bg-[#020617] text-white flex flex-col overflow-hidden">
-
       {/* =====================================================
           TOP BAR
       ====================================================== */}
 
       <header className="h-16 shrink-0 border-b border-white/5 bg-[#0B1120] flex items-center px-4 md:px-6 gap-4">
-
         {/* BACK */}
 
         <button
@@ -243,21 +261,11 @@ export default function StudyViewerPage() {
         {/* RESOURCE INFORMATION */}
 
         <div className="flex items-center gap-3 min-w-0 flex-1">
-
           <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 shrink-0">
-
-            {resource.type === "pdf" ? (
-              <FileText size={18} />
-            ) : resource.type === "youtube" ? (
-              <Play size={18} />
-            ) : (
-              <LinkIcon size={18} />
-            )}
-
+            <ResourceIcon size={18} />
           </div>
 
           <div className="min-w-0">
-
             <h1 className="font-bold text-sm md:text-base truncate">
               {resource.title}
             </h1>
@@ -265,9 +273,7 @@ export default function StudyViewerPage() {
             <p className="text-white/30 text-xs truncate">
               {resource.category}
             </p>
-
           </div>
-
         </div>
 
         {/* OPEN ORIGINAL */}
@@ -278,10 +284,10 @@ export default function StudyViewerPage() {
           rel="noopener noreferrer"
           className="p-2.5 rounded-xl hover:bg-white/5 text-white/40 hover:text-white transition-colors"
           title="Open original resource"
+          aria-label="Open original resource"
         >
           <ExternalLink size={18} />
         </a>
-
       </header>
 
       {/* =====================================================
@@ -289,7 +295,6 @@ export default function StudyViewerPage() {
       ====================================================== */}
 
       <main className="flex-1 min-h-0 bg-[#020617]">
-
         {/* ===================================================
             PDF
         ==================================================== */}
@@ -307,8 +312,8 @@ export default function StudyViewerPage() {
         ==================================================== */}
 
         {resource.type === "youtube" && (
-          <div className="w-full h-full flex items-center justify-center p-4 md:p-8 overflow-auto">
-            <div className="w-full max-w-6xl aspect-video bg-black rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+          <div className="w-full h-full flex items-center justify-center p-2 md:p-6 overflow-auto">
+            <div className="w-full max-w-7xl h-full max-h-[calc(100vh-5rem)] bg-black rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
               <YouTubePlayer
                 url={resource.url}
                 title={resource.title}
@@ -324,90 +329,15 @@ export default function StudyViewerPage() {
 
         {resource.type === "link" && (
           <div className="w-full h-full">
-
             <iframe
               src={resource.url}
               title={resource.title}
               className="w-full h-full border-0"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
             />
-
           </div>
         )}
-
       </main>
     </div>
   );
-}
-
-// =========================================================
-// YOUTUBE URL → EMBED URL
-// =========================================================
-
-function getYouTubeEmbedUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-
-    // -------------------------------------------------------
-    // YOUTUBE PLAYLIST
-    // Example:
-    // https://youtube.com/playlist?list=PLxxxxx
-    // -------------------------------------------------------
-
-    const playlistId = parsed.searchParams.get("list");
-
-    if (playlistId) {
-      return `https://www.youtube-nocookie.com/embed/videoseries?list=${encodeURIComponent(
-        playlistId
-      )}`;
-    }
-
-    // -------------------------------------------------------
-    // YOUTUBE VIDEO
-    // Example:
-    // https://youtube.com/watch?v=VIDEO_ID
-    // -------------------------------------------------------
-
-    const videoId = parsed.searchParams.get("v");
-
-    if (videoId) {
-      return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(
-        videoId
-      )}`;
-    }
-
-    // -------------------------------------------------------
-    // YOUTU.BE VIDEO
-    // Example:
-    // https://youtu.be/VIDEO_ID
-    // -------------------------------------------------------
-
-    if (parsed.hostname.includes("youtu.be")) {
-      const id = parsed.pathname
-        .replace("/", "")
-        .split("?")[0];
-
-      if (id) {
-        return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(
-          id
-        )}`;
-      }
-    }
-
-    // -------------------------------------------------------
-    // ALREADY AN EMBED URL
-    // -------------------------------------------------------
-
-    if (
-      parsed.hostname.includes("youtube.com") ||
-      parsed.hostname.includes("youtube-nocookie.com")
-    ) {
-      if (parsed.pathname.startsWith("/embed/")) {
-        return url;
-      }
-    }
-
-    return url;
-  } catch {
-    return url;
-  }
 }

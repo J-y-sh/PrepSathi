@@ -161,51 +161,40 @@ export function PlannerMode() {
   const handleSaveTask = async (
     title: string,
     description: string,
-    dueDate?: Date
+    dueDate?: Date,
+    subject?: string,
+    topicId?: string,
+    stage?: "prelims" | "mains"
   ) => {
     if (!user) return;
 
     if (editingTask) {
-      await updateTask(
-        editingTask.id,
-        {
-          title,
-          description,
-          dueDate:
-            dueDate
-              ? Timestamp.fromDate(
-                  dueDate
-                )
-              : undefined,
-        }
-      );
+      await updateTask(editingTask.id, {
+        title,
+        description,
+        dueDate: dueDate
+          ? Timestamp.fromDate(dueDate)
+          : undefined,
+      });
     } else {
       await addTask(
         user.uid,
         {
           title,
           description,
-          dueDate:
-            dueDate
-              ? Timestamp.fromDate(
-                  dueDate
-                )
-              : undefined,
-          subject:
-            "General",
-          priority:
-            "medium",
+          dueDate: dueDate
+            ? Timestamp.fromDate(dueDate)
+            : undefined,
+          subject: subject || "General",
+          topicId,
+          stage,
+          priority: "medium",
         }
       );
     }
 
-    setEditingTask(
-      undefined
-    );
-
-    setIsDialogOpen(
-      false
-    );
+    setEditingTask(undefined);
+    setIsDialogOpen(false);
   };
 
   return (

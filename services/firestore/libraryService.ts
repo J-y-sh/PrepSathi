@@ -66,13 +66,13 @@ class LibraryService extends BaseService<LibraryResource> {
   ): Promise<void> {
     await this.update(id, {
       isFavorite: !currentStatus,
-    } as any);
+    });
   }
 
   async markAsOpened(id: string): Promise<void> {
     await this.update(id, {
       lastOpenedAt: serverTimestamp(),
-    } as any);
+    });
   }
 }
 

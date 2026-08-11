@@ -2,7 +2,14 @@
 
 /// <reference types="youtube" />
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import Image from "next/image";
 import YouTube, { YouTubeProps } from "react-youtube";
 import type { YouTubePlayer as YouTubePlayerInstance } from "react-youtube";
 
@@ -118,6 +125,7 @@ export default function YouTubePlayer({
   const playlistId = useMemo(() => {
     try {
       const parsed = new URL(url);
+
       return parsed.searchParams.get("list");
     } catch {
       return null;
@@ -134,27 +142,34 @@ export default function YouTubePlayer({
     try {
       const parsed = new URL(url);
 
-      const id = parsed.searchParams.get("v");
+      const id =
+        parsed.searchParams.get("v");
 
       if (id) {
         return id;
       }
 
-      if (parsed.hostname.includes("youtu.be")) {
-        const pathId = parsed.pathname
-          .replace("/", "")
-          .split("?")[0];
+      if (
+        parsed.hostname.includes("youtu.be")
+      ) {
+        const pathId =
+          parsed.pathname
+            .replace("/", "")
+            .split("?")[0];
 
         return pathId || null;
       }
 
       if (
         parsed.hostname.includes("youtube.com") ||
-        parsed.hostname.includes("youtube-nocookie.com")
+        parsed.hostname.includes(
+          "youtube-nocookie.com"
+        )
       ) {
-        const match = parsed.pathname.match(
-          /\/embed\/([^/]+)/
-        );
+        const match =
+          parsed.pathname.match(
+            /\/embed\/([^/]+)/
+          );
 
         if (match?.[1]) {
           return match[1];
@@ -175,8 +190,6 @@ export default function YouTubePlayer({
 
   useEffect(() => {
     if (!playlistId) {
-      setPlaylist([]);
-      setPlaylistError("");
       return;
     }
 
@@ -203,7 +216,11 @@ export default function YouTubePlayer({
 
         if (!response.ok) {
           throw new Error(
-            (data as unknown as { error?: string })?.error ||
+            (
+              data as unknown as {
+                error?: string;
+              }
+            )?.error ||
               "Failed to load playlist."
           );
         }
@@ -212,7 +229,9 @@ export default function YouTubePlayer({
           return;
         }
 
-        setPlaylist(data.videos ?? []);
+        setPlaylist(
+          data.videos ?? []
+        );
 
         console.log(
           "YouTubePlayer: playlist metadata loaded:",
@@ -252,62 +271,63 @@ export default function YouTubePlayer({
    * =========================================================
    */
 
-  const opts: YouTubeProps["opts"] = {
-    width: "100%",
-    height: "100%",
+  const opts: YouTubeProps["opts"] =
+    useMemo(
+      () => ({
+        width: "100%",
+        height: "100%",
 
-    playerVars: {
-      autoplay: 0,
-      controls: 1,
-      rel: 0,
-      modestbranding: 1,
-      playsinline: 1,
+        playerVars: {
+          autoplay: 0,
+          controls: 1,
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1,
 
-      ...(playlistId
-        ? {
-            listType: "playlist",
-            list: playlistId,
-          }
-        : {}),
-    },
-  };
+          ...(playlistId
+            ? {
+                listType: "playlist" as const,
+                list: playlistId,
+              }
+            : {}),
+        },
+      }),
+      [playlistId]
+    );
 
   /*
    * =========================================================
    * SAFE PLAYER CHECK
    * =========================================================
-   *
-   * YouTube's JS object can remain alive briefly while its
-   * internal iframe is being replaced.
-   *
-   * Therefore merely checking playerRef.current !== null
-   * is NOT enough.
    */
 
-  const isPlayerUsable = (
-    ytPlayer: YouTubePlayerInstance | null
-  ) => {
-    if (!ytPlayer) {
-      return false;
-    }
-
-    try {
-      const iframe =
-        ytPlayer.getIframe?.();
-
-      if (!iframe) {
+  const isPlayerUsable = useCallback(
+    (
+      ytPlayer: YouTubePlayerInstance | null
+    ) => {
+      if (!ytPlayer) {
         return false;
       }
 
-      if (!iframe.isConnected) {
+      try {
+        const iframe =
+          ytPlayer.getIframe?.();
+
+        if (!iframe) {
+          return false;
+        }
+
+        if (!iframe.isConnected) {
+          return false;
+        }
+
+        return true;
+      } catch {
         return false;
       }
-
-      return true;
-    } catch {
-      return false;
-    }
-  };
+    },
+    []
+  );
 
   /*
    * =========================================================
@@ -315,96 +335,111 @@ export default function YouTubePlayer({
    * =========================================================
    */
 
-  const saveProgress = async (
-    progressToSave: VideoProgress,
-    force = false
-  ) => {
-    if (!user || !resourceId) {
-      return;
-    }
+  const saveProgress = useCallback(
+    async (
+      progressToSave: VideoProgress,
+      force = false
+    ) => {
+      if (!user || !resourceId) {
+        return;
+      }
 
-    if (
-      progressToSave.currentTime <= 0 &&
-      progressToSave.status !== "completed" &&
-      !force
-    ) {
-      return;
-    }
+      if (
+        progressToSave.currentTime <= 0 &&
+        progressToSave.status !==
+          "completed" &&
+        !force
+      ) {
+        return;
+      }
 
-    const now = Date.now();
+      /*
+       * Date.now() is intentionally inside the
+       * callback execution and never during render.
+       */
+      const now = Date.now();
 
-    const lastSaved =
-      lastSavedProgressRef.current;
+      const lastSaved =
+        lastSavedProgressRef.current;
 
-    const sameVideo =
-      lastSaved?.videoId ===
-      progressToSave.videoId;
+      const sameVideo =
+        lastSaved?.videoId ===
+        progressToSave.videoId;
 
-    const enoughTimePassed =
-      !lastSaved ||
-      now - lastSaved.timestamp >=
-        SAVE_INTERVAL;
+      const enoughTimePassed =
+        !lastSaved ||
+        now -
+            lastSaved.timestamp >=
+          SAVE_INTERVAL;
 
-    const completed =
-      progressToSave.status ===
-      "completed";
+      const completed =
+        progressToSave.status ===
+        "completed";
 
-    const videoChanged =
-      !sameVideo;
+      const videoChanged =
+        !sameVideo;
 
-    if (
-      !force &&
-      !videoChanged &&
-      !enoughTimePassed &&
-      !completed
-    ) {
-      return;
-    }
+      if (
+        !force &&
+        !videoChanged &&
+        !enoughTimePassed &&
+        !completed
+      ) {
+        return;
+      }
 
-    lastSavedProgressRef.current = {
-      videoId:
-        progressToSave.videoId,
-      currentTime:
-        progressToSave.currentTime,
-      timestamp: now,
-    };
+      lastSavedProgressRef.current = {
+        videoId:
+          progressToSave.videoId,
 
-    try {
-      await videoProgressService.saveVideoProgress(
-        user.uid,
-        resourceId,
-        playlistId,
-        {
-          videoId:
-            progressToSave.videoId,
+        currentTime:
+          progressToSave.currentTime,
 
-          currentTime:
-            progressToSave.currentTime,
+        timestamp: now,
+      };
 
-          duration:
-            progressToSave.duration,
+      try {
+        await videoProgressService.saveVideoProgress(
+          user.uid,
+          resourceId,
+          playlistId,
+          {
+            videoId:
+              progressToSave.videoId,
 
-          percentage:
-            progressToSave.percentage,
+            currentTime:
+              progressToSave.currentTime,
 
-          completed:
-            progressToSave.status ===
-            "completed",
-        }
-      );
+            duration:
+              progressToSave.duration,
 
-      console.log(
-        `[VideoProgress] saved: ${progressToSave.videoId} at ${Math.round(
-          progressToSave.currentTime
-        )}s`
-      );
-    } catch (error) {
-      console.error(
-        "[VideoProgress] save failed:",
-        error
-      );
-    }
-  };
+            percentage:
+              progressToSave.percentage,
+
+            completed:
+              progressToSave.status ===
+              "completed",
+          }
+        );
+
+        console.log(
+          `[VideoProgress] saved: ${progressToSave.videoId} at ${Math.round(
+            progressToSave.currentTime
+          )}s`
+        );
+      } catch (error) {
+        console.error(
+          "[VideoProgress] save failed:",
+          error
+        );
+      }
+    },
+    [
+      user,
+      resourceId,
+      playlistId,
+    ]
+  );
 
   /*
    * =========================================================
@@ -412,87 +447,98 @@ export default function YouTubePlayer({
    * =========================================================
    */
 
-  const readPlayerProgress = (
-    ytPlayer: YouTubePlayerInstance
-  ): VideoProgress | null => {
-    if (!isPlayerUsable(ytPlayer)) {
-      return null;
-    }
-
-    try {
-      const data =
-        ytPlayer.getVideoData();
-
-      const currentVideoId =
-        data?.video_id;
-
-      if (!currentVideoId) {
-        return null;
-      }
-
-      const currentTime =
-        ytPlayer.getCurrentTime();
-
-      const duration =
-        ytPlayer.getDuration();
-
-      if (
-        !Number.isFinite(duration) ||
-        duration <= 0
-      ) {
-        return null;
-      }
-
-      const safeCurrentTime =
-        Math.max(
-          0,
-          Math.min(
-            currentTime,
-            duration
+  const readPlayerProgress =
+    useCallback(
+      (
+        ytPlayer: YouTubePlayerInstance
+      ): VideoProgress | null => {
+        if (
+          !isPlayerUsable(
+            ytPlayer
           )
-        );
+        ) {
+          return null;
+        }
 
-      const percentage =
-        Math.min(
-          safeCurrentTime / duration,
-          1
-        );
+        try {
+          const data =
+            ytPlayer.getVideoData();
 
-      let status:
-        | "not_started"
-        | "in_progress"
-        | "completed";
+          const currentVideoId =
+            data?.video_id;
 
-      if (
-        percentage >=
-        COMPLETION_THRESHOLD
-      ) {
-        status = "completed";
-      } else if (
-        safeCurrentTime > 0
-      ) {
-        status = "in_progress";
-      } else {
-        status = "not_started";
-      }
+          if (!currentVideoId) {
+            return null;
+          }
 
-      return {
-        videoId:
-          currentVideoId,
+          const currentTime =
+            ytPlayer.getCurrentTime();
 
-        currentTime:
-          safeCurrentTime,
+          const duration =
+            ytPlayer.getDuration();
 
-        duration,
+          if (
+            !Number.isFinite(
+              duration
+            ) ||
+            duration <= 0
+          ) {
+            return null;
+          }
 
-        percentage,
+          const safeCurrentTime =
+            Math.max(
+              0,
+              Math.min(
+                currentTime,
+                duration
+              )
+            );
 
-        status,
-      };
-    } catch {
-      return null;
-    }
-  };
+          const percentage =
+            Math.min(
+              safeCurrentTime /
+                duration,
+              1
+            );
+
+          let status:
+            | "not_started"
+            | "in_progress"
+            | "completed";
+
+          if (
+            percentage >=
+            COMPLETION_THRESHOLD
+          ) {
+            status = "completed";
+          } else if (
+            safeCurrentTime > 0
+          ) {
+            status = "in_progress";
+          } else {
+            status = "not_started";
+          }
+
+          return {
+            videoId:
+              currentVideoId,
+
+            currentTime:
+              safeCurrentTime,
+
+            duration,
+
+            percentage,
+
+            status,
+          };
+        } catch {
+          return null;
+        }
+      },
+      [isPlayerUsable]
+    );
 
   /*
    * =========================================================
@@ -500,228 +546,219 @@ export default function YouTubePlayer({
    * =========================================================
    */
 
-  const updateProgress = (
-    ytPlayer: YouTubePlayerInstance,
-    persist = true
-  ) => {
-    const nextProgress =
-      readPlayerProgress(
-        ytPlayer
-      );
+  const updateProgress =
+    useCallback(
+      (
+        ytPlayer: YouTubePlayerInstance,
+        persist = true
+      ) => {
+        const nextProgress =
+          readPlayerProgress(
+            ytPlayer
+          );
 
-    if (!nextProgress) {
-      return null;
-    }
+        if (!nextProgress) {
+          return null;
+        }
 
-    if (
-      isSwitchingVideoRef.current &&
-      nextProgress.currentTime <= 0
-    ) {
-      return nextProgress;
-    }
+        if (
+          isSwitchingVideoRef.current &&
+          nextProgress.currentTime <= 0
+        ) {
+          return nextProgress;
+        }
 
-    progressRef.current =
-      nextProgress;
+        progressRef.current =
+          nextProgress;
 
-    lastKnownProgressRef.current =
-      nextProgress;
+        lastKnownProgressRef.current =
+          nextProgress;
 
-    setProgress(
-      nextProgress
+        setProgress(
+          nextProgress
+        );
+
+        if (persist) {
+          void saveProgress(
+            nextProgress
+          );
+        }
+
+        console.log(
+          "YouTubePlayer: progress:",
+          {
+            videoId:
+              nextProgress.videoId,
+
+            currentTime:
+              Math.round(
+                nextProgress.currentTime
+              ),
+
+            duration:
+              Math.round(
+                nextProgress.duration
+              ),
+
+            percentage:
+              `${Math.round(
+                nextProgress.percentage *
+                  100
+              )}%`,
+
+            status:
+              nextProgress.status,
+          }
+        );
+
+        return nextProgress;
+      },
+      [
+        readPlayerProgress,
+        saveProgress,
+      ]
     );
-
-    if (persist) {
-      void saveProgress(
-        nextProgress
-      );
-    }
-
-    console.log(
-      "YouTubePlayer: progress:",
-      {
-        videoId:
-          nextProgress.videoId,
-
-        currentTime:
-          Math.round(
-            nextProgress.currentTime
-          ),
-
-        duration:
-          Math.round(
-            nextProgress.duration
-          ),
-
-        percentage:
-          `${Math.round(
-            nextProgress.percentage *
-              100
-          )}%`,
-
-        status:
-          nextProgress.status,
-      }
-    );
-
-    return nextProgress;
-  };
 
   /*
    * =========================================================
    * SAFE SEEK
    * =========================================================
-   *
-   * THIS IS THE IMPORTANT FIX.
-   *
-   * YouTube may expose getVideoData() while its iframe is
-   * still internally transitioning.
-   *
-   * We therefore:
-   *
-   * 1. Check iframe.
-   * 2. Check video ID.
-   * 3. Check duration.
-   * 4. Wait briefly after playlist transitions.
-   * 5. Retry instead of allowing seekTo() to crash.
    */
 
-  const safeSeekTo = async (
-    ytPlayer: YouTubePlayerInstance,
-    targetVideoId: string,
-    time: number,
-    requestId: number
-  ): Promise<boolean> => {
-    for (
-      let attempt = 0;
-      attempt < MAX_SEEK_RETRIES;
-      attempt++
-    ) {
-      if (
-        requestId !==
-        resumeRequestIdRef.current
-      ) {
-        return false;
-      }
+  const safeSeekTo =
+    useCallback(
+      async (
+        ytPlayer: YouTubePlayerInstance,
+        targetVideoId: string,
+        time: number,
+        requestId: number
+      ): Promise<boolean> => {
+        for (
+          let attempt = 0;
+          attempt <
+          MAX_SEEK_RETRIES;
+          attempt++
+        ) {
+          if (
+            requestId !==
+            resumeRequestIdRef.current
+          ) {
+            return false;
+          }
 
-      if (
-        !isPlayerUsable(
-          ytPlayer
-        )
-      ) {
-        await new Promise(
-          (resolve) =>
-            window.setTimeout(
-              resolve,
-              SEEK_RETRY_DELAY
+          if (
+            !isPlayerUsable(
+              ytPlayer
             )
-        );
+          ) {
+            await new Promise(
+              (resolve) =>
+                window.setTimeout(
+                  resolve,
+                  SEEK_RETRY_DELAY
+                )
+            );
 
-        continue;
-      }
+            continue;
+          }
 
-      try {
-        const data =
-          ytPlayer.getVideoData();
+          try {
+            const data =
+              ytPlayer.getVideoData();
 
-        const actualVideoId =
-          data?.video_id;
+            const actualVideoId =
+              data?.video_id;
 
-        if (
-          actualVideoId !==
-          targetVideoId
-        ) {
-          await new Promise(
-            (resolve) =>
-              window.setTimeout(
-                resolve,
-                SEEK_RETRY_DELAY
+            if (
+              actualVideoId !==
+              targetVideoId
+            ) {
+              await new Promise(
+                (resolve) =>
+                  window.setTimeout(
+                    resolve,
+                    SEEK_RETRY_DELAY
+                  )
+              );
+
+              continue;
+            }
+
+            const duration =
+              ytPlayer.getDuration();
+
+            if (
+              !Number.isFinite(
+                duration
+              ) ||
+              duration <= 0
+            ) {
+              await new Promise(
+                (resolve) =>
+                  window.setTimeout(
+                    resolve,
+                    SEEK_RETRY_DELAY
+                  )
+              );
+
+              continue;
+            }
+
+            const safeTime =
+              Math.max(
+                0,
+                Math.min(
+                  time,
+                  duration - 1
+                )
+              );
+
+            if (
+              !isPlayerUsable(
+                ytPlayer
               )
-          );
+            ) {
+              continue;
+            }
 
-          continue;
+            ytPlayer.seekTo(
+              safeTime,
+              true
+            );
+
+            console.log(
+              `[VideoProgress] resumed: ${targetVideoId} at ${Math.round(
+                safeTime
+              )}s`
+            );
+
+            return true;
+          } catch (error) {
+            console.warn(
+              `[VideoProgress] seek attempt ${
+                attempt + 1
+              } failed:`,
+              error
+            );
+
+            await new Promise(
+              (resolve) =>
+                window.setTimeout(
+                  resolve,
+                  SEEK_RETRY_DELAY
+                )
+            );
+          }
         }
-
-        const duration =
-          ytPlayer.getDuration();
-
-        if (
-          !Number.isFinite(
-            duration
-          ) ||
-          duration <= 0
-        ) {
-          await new Promise(
-            (resolve) =>
-              window.setTimeout(
-                resolve,
-                SEEK_RETRY_DELAY
-              )
-          );
-
-          continue;
-        }
-
-        const safeTime =
-          Math.max(
-            0,
-            Math.min(
-              time,
-              duration - 1
-            )
-          );
-
-        /*
-         * Final iframe check immediately before seek.
-         */
-        if (
-          !isPlayerUsable(
-            ytPlayer
-          )
-        ) {
-          continue;
-        }
-
-        ytPlayer.seekTo(
-          safeTime,
-          true
-        );
-
-        console.log(
-          `[VideoProgress] resumed: ${targetVideoId} at ${Math.round(
-            safeTime
-          )}s`
-        );
-
-        return true;
-      } catch (error) {
-        /*
-         * YouTube can throw here when its internal iframe
-         * is replaced. Do NOT propagate the exception.
-         */
 
         console.warn(
-          `[VideoProgress] seek attempt ${
-            attempt + 1
-          } failed:`,
-          error
+          `[VideoProgress] unable to seek ${targetVideoId} after ${MAX_SEEK_RETRIES} attempts`
         );
 
-        await new Promise(
-          (resolve) =>
-            window.setTimeout(
-              resolve,
-              SEEK_RETRY_DELAY
-            )
-        );
-      }
-    }
-
-    console.warn(
-      `[VideoProgress] unable to seek ${targetVideoId} after ${MAX_SEEK_RETRIES} attempts`
+        return false;
+      },
+      [isPlayerUsable]
     );
-
-    return false;
-  };
 
   /*
    * =========================================================
@@ -729,149 +766,155 @@ export default function YouTubePlayer({
    * =========================================================
    */
 
-  const resumePlayback = async (
-    ytPlayer: YouTubePlayerInstance,
-    vId: string
-  ) => {
-    if (
-      !user ||
-      !resourceId
-    ) {
-      return;
-    }
+  const resumePlayback =
+    useCallback(
+      async (
+        ytPlayer: YouTubePlayerInstance,
+        vId: string
+      ) => {
+        if (
+          !user ||
+          !resourceId
+        ) {
+          return;
+        }
 
-    const requestId =
-      ++resumeRequestIdRef.current;
+        const requestId =
+          ++resumeRequestIdRef.current;
 
-    isResumingRef.current =
-      true;
-
-    try {
-      console.log(
-        `[VideoProgress] loading: ${vId}`
-      );
-
-      const savedProgress =
-        await videoProgressService.getVideoProgress(
-          user.uid,
-          resourceId,
-          vId
-        );
-
-      if (
-        requestId !==
-        resumeRequestIdRef.current
-      ) {
-        return;
-      }
-
-      if (
-        !isPlayerUsable(
-          ytPlayer
-        )
-      ) {
-        return;
-      }
-
-      const actualVideoId =
-        ytPlayer
-          .getVideoData()
-          ?.video_id;
-
-      if (
-        actualVideoId !==
-        vId
-      ) {
-        return;
-      }
-
-      if (
-        !savedProgress ||
-        savedProgress.completed ||
-        savedProgress.currentTime <= 0
-      ) {
-        return;
-      }
-
-      const duration =
-        ytPlayer.getDuration();
-
-      if (
-        !duration ||
-        duration <= 0
-      ) {
-        return;
-      }
-
-      const time =
-        savedProgress.currentTime;
-
-      if (
-        time >=
-        duration - 5
-      ) {
-        return;
-      }
-
-      const success =
-        await safeSeekTo(
-          ytPlayer,
-          vId,
-          time,
-          requestId
-        );
-
-      if (
-        !success ||
-        requestId !==
-          resumeRequestIdRef.current
-      ) {
-        return;
-      }
-
-      const mins =
-        Math.floor(
-          time / 60
-        );
-
-      const secs =
-        Math.floor(
-          time % 60
-        );
-
-      setResumingInfo(
-        `Resuming from ${mins}:${secs
-          .toString()
-          .padStart(2, "0")}`
-      );
-
-      window.setTimeout(
-        () => {
-          setResumingInfo(
-            null
-          );
-        },
-        3000
-      );
-    } catch (error) {
-      /*
-       * Resume failure must NEVER break the player.
-       */
-
-      console.error(
-        "[VideoProgress] Resume failed:",
-        error
-      );
-    } finally {
-      if (
-        requestId ===
-        resumeRequestIdRef.current
-      ) {
         isResumingRef.current =
-          false;
-      }
-    }
-  };
+          true;
+
+        try {
+          console.log(
+            `[VideoProgress] loading: ${vId}`
+          );
+
+          const savedProgress =
+            await videoProgressService.getVideoProgress(
+              user.uid,
+              resourceId,
+              vId
+            );
+
+          if (
+            requestId !==
+            resumeRequestIdRef.current
+          ) {
+            return;
+          }
+
+          if (
+            !isPlayerUsable(
+              ytPlayer
+            )
+          ) {
+            return;
+          }
+
+          const actualVideoId =
+            ytPlayer
+              .getVideoData()
+              ?.video_id;
+
+          if (
+            actualVideoId !==
+            vId
+          ) {
+            return;
+          }
+
+          if (
+            !savedProgress ||
+            savedProgress.completed ||
+            savedProgress.currentTime <=
+              0
+          ) {
+            return;
+          }
+
+          const duration =
+            ytPlayer.getDuration();
+
+          if (
+            !duration ||
+            duration <= 0
+          ) {
+            return;
+          }
+
+          const time =
+            savedProgress.currentTime;
+
+          if (
+            time >=
+            duration - 5
+          ) {
+            return;
+          }
+
+          const success =
+            await safeSeekTo(
+              ytPlayer,
+              vId,
+              time,
+              requestId
+            );
+
+          if (
+            !success ||
+            requestId !==
+              resumeRequestIdRef.current
+          ) {
+            return;
+          }
+
+          const mins =
+            Math.floor(
+              time / 60
+            );
+
+          const secs =
+            Math.floor(
+              time % 60
+            );
+
+          setResumingInfo(
+            `Resuming from ${mins}:${secs
+              .toString()
+              .padStart(2, "0")}`
+          );
+
+          window.setTimeout(
+            () => {
+              setResumingInfo(
+                null
+              );
+            },
+            3000
+          );
+        } catch (error) {
+          console.error(
+            "[VideoProgress] Resume failed:",
+            error
+          );
+        } finally {
+          if (
+            requestId ===
+            resumeRequestIdRef.current
+          ) {
+            isResumingRef.current =
+              false;
+          }
+        }
+      },
+      [
+        user,
+        resourceId,
+        isPlayerUsable,
+        safeSeekTo,
+      ]
+    );
 
   /*
    * =========================================================
@@ -879,112 +922,122 @@ export default function YouTubePlayer({
    * =========================================================
    */
 
-  const handleVideoChange = async (
-    ytPlayer: YouTubePlayerInstance,
-    newVideoId: string
-  ) => {
-    const previousVideoId =
-      currentVideoIdRef.current;
+  const handleVideoChange =
+    useCallback(
+      async (
+        ytPlayer: YouTubePlayerInstance,
+        newVideoId: string
+      ) => {
+        const previousVideoId =
+          currentVideoIdRef.current;
 
-    if (
-      previousVideoId ===
-      newVideoId
-    ) {
-      return;
-    }
+        if (
+          previousVideoId ===
+          newVideoId
+        ) {
+          return;
+        }
 
-    isSwitchingVideoRef.current =
-      true;
+        isSwitchingVideoRef.current =
+          true;
 
-    resumeRequestIdRef.current++;
+        resumeRequestIdRef.current++;
 
-    /*
-     * Save previous video before switching.
-     */
+        /*
+         * Save previous video before switching.
+         */
 
-    if (
-      previousVideoId &&
-      user &&
-      resourceId
-    ) {
-      const previousProgress =
-        lastKnownProgressRef.current;
-
-      if (
-        previousProgress &&
-        previousProgress.videoId ===
+        if (
           previousVideoId &&
-        previousProgress.currentTime >
-          0
-      ) {
-        await saveProgress(
-          previousProgress,
-          true
+          user &&
+          resourceId
+        ) {
+          const previousProgress =
+            lastKnownProgressRef.current;
+
+          if (
+            previousProgress &&
+            previousProgress.videoId ===
+              previousVideoId &&
+            previousProgress.currentTime >
+              0
+          ) {
+            await saveProgress(
+              previousProgress,
+              true
+            );
+          }
+        }
+
+        console.log(
+          `[VideoProgress] video changed: ${previousVideoId} -> ${newVideoId}`
         );
-      }
-    }
 
-    console.log(
-      `[VideoProgress] video changed: ${previousVideoId} -> ${newVideoId}`
-    );
+        currentVideoIdRef.current =
+          newVideoId;
 
-    currentVideoIdRef.current =
-      newVideoId;
+        setProgress(null);
 
-    setProgress(null);
+        progressRef.current =
+          null;
 
-    progressRef.current =
-      null;
+        lastSavedProgressRef.current =
+          null;
 
-    lastSavedProgressRef.current =
-      null;
-
-    await resumePlayback(
-      ytPlayer,
-      newVideoId
-    );
-
-    if (
-      currentVideoIdRef.current !==
-      newVideoId
-    ) {
-      return;
-    }
-
-    isSwitchingVideoRef.current =
-      false;
-
-    const refreshedProgress =
-      readPlayerProgress(
-        ytPlayer
-      );
-
-    if (
-      refreshedProgress &&
-      refreshedProgress.videoId ===
-        newVideoId
-    ) {
-      progressRef.current =
-        refreshedProgress;
-
-      lastKnownProgressRef.current =
-        refreshedProgress;
-
-      setProgress(
-        refreshedProgress
-      );
-
-      if (
-        refreshedProgress.currentTime >
-        0
-      ) {
-        await saveProgress(
-          refreshedProgress,
-          false
+        await resumePlayback(
+          ytPlayer,
+          newVideoId
         );
-      }
-    }
-  };
+
+        if (
+          currentVideoIdRef.current !==
+          newVideoId
+        ) {
+          return;
+        }
+
+        isSwitchingVideoRef.current =
+          false;
+
+        const refreshedProgress =
+          readPlayerProgress(
+            ytPlayer
+          );
+
+        if (
+          refreshedProgress &&
+          refreshedProgress.videoId ===
+            newVideoId
+        ) {
+          progressRef.current =
+            refreshedProgress;
+
+          lastKnownProgressRef.current =
+            refreshedProgress;
+
+          setProgress(
+            refreshedProgress
+          );
+
+          if (
+            refreshedProgress.currentTime >
+            0
+          ) {
+            await saveProgress(
+              refreshedProgress,
+              false
+            );
+          }
+        }
+      },
+      [
+        user,
+        resourceId,
+        saveProgress,
+        resumePlayback,
+        readPlayerProgress,
+      ]
+    );
 
   /*
    * =========================================================
@@ -992,119 +1045,124 @@ export default function YouTubePlayer({
    * =========================================================
    */
 
-  const onReady: YouTubeProps["onReady"] =
-    async (event) => {
-      const ytPlayer =
-        event.target;
+  const onReady:
+    YouTubeProps["onReady"] =
+    useCallback(
+      async (event: Parameters<NonNullable<YouTubeProps["onReady"]>>[0]) => {
+        const ytPlayer =
+          event.target;
 
-      console.log(
-        "YouTubePlayer: player ready"
-      );
+        console.log(
+          "YouTubePlayer: player ready"
+        );
 
-      playerRef.current =
-        ytPlayer;
+        playerRef.current =
+          ytPlayer;
 
-      setPlayer(
-        ytPlayer
-      );
-
-      /*
-       * Give the iframe a moment to finish initialization.
-       * This is particularly important for playlist players.
-       */
-
-      await new Promise(
-        (resolve) =>
-          window.setTimeout(
-            resolve,
-            250
-          )
-      );
-
-      if (
-        !isPlayerUsable(
-          ytPlayer
-        )
-      ) {
-        return;
-      }
-
-      const vId =
-        ytPlayer
-          .getVideoData()
-          ?.video_id;
-
-      if (!vId) {
-        return;
-      }
-
-      currentVideoIdRef.current =
-        vId;
-
-      if (playlistId) {
-        try {
-          const index =
-            ytPlayer.getPlaylistIndex();
-
-          if (
-            typeof index ===
-              "number" &&
-            index >= 0
-          ) {
-            currentIndexRef.current =
-              index;
-
-            setCurrentIndex(
-              index
-            );
-          }
-        } catch {
-          // Ignore transient playlist initialization errors.
-        }
-      }
-
-      await resumePlayback(
-        ytPlayer,
-        vId
-      );
-
-      if (
-        !isPlayerUsable(
-          ytPlayer
-        )
-      ) {
-        return;
-      }
-
-      const restoredProgress =
-        readPlayerProgress(
+        setPlayer(
           ytPlayer
         );
 
-      if (
-        restoredProgress
-      ) {
-        progressRef.current =
-          restoredProgress;
-
-        lastKnownProgressRef.current =
-          restoredProgress;
-
-        setProgress(
-          restoredProgress
+        await new Promise(
+          (resolve) =>
+            window.setTimeout(
+              resolve,
+              250
+            )
         );
 
         if (
-          restoredProgress.currentTime >
-          0
+          !isPlayerUsable(
+            ytPlayer
+          )
         ) {
-          await saveProgress(
-            restoredProgress,
-            false
-          );
+          return;
         }
-      }
-    };
+
+        const vId =
+          ytPlayer
+            .getVideoData()
+            ?.video_id;
+
+        if (!vId) {
+          return;
+        }
+
+        currentVideoIdRef.current =
+          vId;
+
+        if (playlistId) {
+          try {
+            const index =
+              ytPlayer.getPlaylistIndex();
+
+            if (
+              typeof index ===
+                "number" &&
+              index >= 0
+            ) {
+              currentIndexRef.current =
+                index;
+
+              setCurrentIndex(
+                index
+              );
+            }
+          } catch {
+            // Ignore transient playlist initialization errors.
+          }
+        }
+
+        await resumePlayback(
+          ytPlayer,
+          vId
+        );
+
+        if (
+          !isPlayerUsable(
+            ytPlayer
+          )
+        ) {
+          return;
+        }
+
+        const restoredProgress =
+          readPlayerProgress(
+            ytPlayer
+          );
+
+        if (
+          restoredProgress
+        ) {
+          progressRef.current =
+            restoredProgress;
+
+          lastKnownProgressRef.current =
+            restoredProgress;
+
+          setProgress(
+            restoredProgress
+          );
+
+          if (
+            restoredProgress.currentTime >
+            0
+          ) {
+            await saveProgress(
+              restoredProgress,
+              false
+            );
+          }
+        }
+      },
+      [
+        playlistId,
+        isPlayerUsable,
+        resumePlayback,
+        readPlayerProgress,
+        saveProgress,
+      ]
+    );
 
   /*
    * =========================================================
@@ -1112,183 +1170,196 @@ export default function YouTubePlayer({
    * =========================================================
    */
 
-  const onStateChange: YouTubeProps["onStateChange"] =
-    async (event) => {
-      const ytPlayer =
-        event.target;
+  const onStateChange:
+    YouTubeProps["onStateChange"] =
+    useCallback(
+      async (event: Parameters<NonNullable<YouTubeProps["onStateChange"]>>[0]) => {
+        const ytPlayer =
+          event.target;
 
-      const state =
-        event.data;
+        const state =
+          event.data;
 
-      console.log(
-        "YouTubePlayer: state changed:",
-        state
-      );
+        console.log(
+          "YouTubePlayer: state changed:",
+          state
+        );
 
-      let currentVideoId:
-        | string
-        | undefined;
+        let currentVideoId:
+          | string
+          | undefined;
 
-      try {
-        currentVideoId =
-          ytPlayer
-            .getVideoData()
-            ?.video_id;
-      } catch {
-        currentVideoId =
-          undefined;
-      }
-
-      console.log(
-        "YouTubePlayer: current video:",
-        currentVideoId
-      );
-
-      /*
-       * Update playlist index.
-       */
-
-      if (playlistId) {
         try {
-          const index =
-            ytPlayer.getPlaylistIndex();
-
-          if (
-            typeof index ===
-              "number" &&
-            index >= 0
-          ) {
-            currentIndexRef.current =
-              index;
-
-            setCurrentIndex(
-              index
-            );
-          }
+          currentVideoId =
+            ytPlayer
+              .getVideoData()
+              ?.video_id;
         } catch {
-          // Ignore transient transition state.
-        }
-      }
-
-      /*
-       * YouTube has temporarily lost the video during
-       * playlist transition.
-       */
-
-      if (!currentVideoId) {
-        if (
-          (state === 2 ||
-            state === 0) &&
-          lastKnownProgressRef.current
-        ) {
-          void saveProgress(
-            lastKnownProgressRef.current,
-            true
-          );
+          currentVideoId =
+            undefined;
         }
 
-        return;
-      }
-
-      /*
-       * Detect video change.
-       */
-
-      if (
-        currentVideoIdRef.current !==
-        currentVideoId
-      ) {
-        await handleVideoChange(
-          ytPlayer,
+        console.log(
+          "YouTubePlayer: current video:",
           currentVideoId
         );
-      }
 
-      /*
-       * Resume/switch protection.
-       */
+        /*
+         * Update playlist index.
+         */
 
-      if (
-        isSwitchingVideoRef.current ||
-        isResumingRef.current
-      ) {
-        return;
-      }
+        if (playlistId) {
+          try {
+            const index =
+              ytPlayer.getPlaylistIndex();
 
-      /*
-       * PAUSED
-       */
+            if (
+              typeof index ===
+                "number" &&
+              index >= 0
+            ) {
+              currentIndexRef.current =
+                index;
 
-      if (state === 2) {
-        const pausedProgress =
-          updateProgress(
-            ytPlayer,
-            false
-          );
+              setCurrentIndex(
+                index
+              );
+            }
+          } catch {
+            // Ignore transient transition state.
+          }
+        }
+
+        /*
+         * YouTube temporarily lost the video
+         * during playlist transition.
+         */
+
+        if (!currentVideoId) {
+          if (
+            (state === 2 ||
+              state === 0) &&
+            lastKnownProgressRef.current
+          ) {
+            void saveProgress(
+              lastKnownProgressRef.current,
+              true
+            );
+          }
+
+          return;
+        }
+
+        /*
+         * Detect video change.
+         */
 
         if (
-          pausedProgress &&
-          pausedProgress.currentTime >
-            0
+          currentVideoIdRef.current !==
+          currentVideoId
         ) {
-          await saveProgress(
-            pausedProgress,
-            true
+          await handleVideoChange(
+            ytPlayer,
+            currentVideoId
           );
         }
 
-        return;
-      }
+        /*
+         * Resume/switch protection.
+         */
 
-      /*
-       * ENDED
-       */
-
-      if (state === 0) {
-        const endedProgress =
-          readPlayerProgress(
-            ytPlayer
-          );
-
-        if (endedProgress) {
-          const completedProgress: VideoProgress =
-            {
-              ...endedProgress,
-              currentTime:
-                endedProgress.duration,
-              percentage: 1,
-              status:
-                "completed",
-            };
-
-          progressRef.current =
-            completedProgress;
-
-          lastKnownProgressRef.current =
-            completedProgress;
-
-          setProgress(
-            completedProgress
-          );
-
-          await saveProgress(
-            completedProgress,
-            true
-          );
+        if (
+          isSwitchingVideoRef.current ||
+          isResumingRef.current
+        ) {
+          return;
         }
 
-        return;
-      }
+        /*
+         * PAUSED
+         */
 
-      /*
-       * PLAYING / BUFFERING / CUED
-       */
+        if (state === 2) {
+          const pausedProgress =
+            updateProgress(
+              ytPlayer,
+              false
+            );
 
-      updateProgress(
-        ytPlayer,
-        true
-      );
-    };
+          if (
+            pausedProgress &&
+            pausedProgress.currentTime >
+              0
+          ) {
+            await saveProgress(
+              pausedProgress,
+              true
+            );
+          }
+
+          return;
+        }
+
+        /*
+         * ENDED
+         */
+
+        if (state === 0) {
+          const endedProgress =
+            readPlayerProgress(
+              ytPlayer
+            );
+
+          if (endedProgress) {
+            const completedProgress: VideoProgress =
+              {
+                ...endedProgress,
+
+                currentTime:
+                  endedProgress.duration,
+
+                percentage: 1,
+
+                status:
+                  "completed",
+              };
+
+            progressRef.current =
+              completedProgress;
+
+            lastKnownProgressRef.current =
+              completedProgress;
+
+            setProgress(
+              completedProgress
+            );
+
+            await saveProgress(
+              completedProgress,
+              true
+            );
+          }
+
+          return;
+        }
+
+        /*
+         * PLAYING / BUFFERING / CUED
+         */
+
+        updateProgress(
+          ytPlayer,
+          true
+        );
+      },
+      [
+        playlistId,
+        saveProgress,
+        handleVideoChange,
+        updateProgress,
+        readPlayerProgress,
+      ]
+    );
 
   /*
    * =========================================================
@@ -1331,9 +1402,8 @@ export default function YouTubePlayer({
     };
   }, [
     player,
-    user,
-    resourceId,
-    playlistId,
+    isPlayerUsable,
+    updateProgress,
   ]);
 
   /*
@@ -1343,6 +1413,9 @@ export default function YouTubePlayer({
    */
 
   useEffect(() => {
+    const currentResumeRequestId =
+      resumeRequestIdRef.current;
+
     return () => {
       const lastProgress =
         lastKnownProgressRef.current;
@@ -1363,12 +1436,17 @@ export default function YouTubePlayer({
       playerRef.current =
         null;
 
-      resumeRequestIdRef.current++;
+      if (
+        resumeRequestIdRef.current ===
+        currentResumeRequestId
+      ) {
+        resumeRequestIdRef.current++;
+      }
     };
   }, [
     user,
     resourceId,
-    playlistId,
+    saveProgress,
   ]);
 
   /*
@@ -1377,94 +1455,101 @@ export default function YouTubePlayer({
    * =========================================================
    */
 
-  const playVideoAt = async (
-    index: number
-  ) => {
-    const ytPlayer =
-      playerRef.current;
+  const playVideoAt =
+    useCallback(
+      async (index: number) => {
+        const ytPlayer =
+          playerRef.current;
 
-    if (
-      !ytPlayer ||
-      !playlistId
-    ) {
-      return;
-    }
+        if (
+          !ytPlayer ||
+          !playlistId
+        ) {
+          return;
+        }
 
-    if (
-      index ===
-      currentIndexRef.current
-    ) {
-      return;
-    }
+        if (
+          index ===
+          currentIndexRef.current
+        ) {
+          return;
+        }
 
-    if (
-      !isPlayerUsable(
-        ytPlayer
-      )
-    ) {
-      return;
-    }
+        if (
+          !isPlayerUsable(
+            ytPlayer
+          )
+        ) {
+          return;
+        }
 
-    console.log(
-      "YouTubePlayer: switching to index:",
-      index
+        console.log(
+          "YouTubePlayer: switching to index:",
+          index
+        );
+
+        /*
+         * Save current video BEFORE switching.
+         */
+
+        const currentProgress =
+          lastKnownProgressRef.current;
+
+        if (
+          currentProgress &&
+          currentProgress.currentTime >
+            0 &&
+          user &&
+          resourceId
+        ) {
+          await saveProgress(
+            currentProgress,
+            true
+          );
+        }
+
+        /*
+         * Enter transition mode.
+         */
+
+        isSwitchingVideoRef.current =
+          true;
+
+        resumeRequestIdRef.current++;
+
+        currentIndexRef.current =
+          index;
+
+        setCurrentIndex(
+          index
+        );
+
+        /*
+         * Protect playVideoAt().
+         */
+
+        try {
+          ytPlayer.playVideoAt(
+            index
+          );
+        } catch (error) {
+          console.error(
+            "YouTubePlayer: failed to switch playlist video:",
+            error
+          );
+
+          isSwitchingVideoRef.current =
+            false;
+        }
+      },
+      [
+        playlistId,
+        user,
+        resourceId,
+        isPlayerUsable,
+        saveProgress,
+      ]
     );
-
-    /*
-     * Save current video BEFORE switching.
-     */
-
-    const currentProgress =
-      lastKnownProgressRef.current;
-
-    if (
-      currentProgress &&
-      currentProgress.currentTime >
-        0 &&
-      user &&
-      resourceId
-    ) {
-      await saveProgress(
-        currentProgress,
-        true
-      );
-    }
-
-    /*
-     * Immediately enter transition mode.
-     */
-
-    isSwitchingVideoRef.current =
-      true;
-
-    resumeRequestIdRef.current++;
-
-    currentIndexRef.current =
-      index;
-
-    setCurrentIndex(
-      index
-    );
-
-    /*
-     * playVideoAt itself can throw if YouTube's iframe is
-     * being replaced. Protect the call.
-     */
-
-    try {
-      ytPlayer.playVideoAt(
-        index
-      );
-    } catch (error) {
-      console.error(
-        "YouTubePlayer: failed to switch playlist video:",
-        error
-      );
-
-      isSwitchingVideoRef.current =
-        false;
-    }
-  };
 
   /*
    * =========================================================
@@ -1639,12 +1724,14 @@ export default function YouTubePlayer({
 
                   <div className="relative w-24 h-14 shrink-0 rounded-lg overflow-hidden bg-white/5">
                     {video.thumbnail ? (
-                      <img
+                      <Image
                         src={
                           video.thumbnail
                         }
                         alt=""
-                        className="w-full h-full object-cover"
+                        fill
+                        sizes="96px"
+                        className="object-cover"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-white/20 text-xs">

@@ -22,7 +22,9 @@ class TaskService extends BaseService<Task> {
   async markCompleted(id: string, completed: boolean) {
     await this.update(id, {
       completed,
-      completedAt: completed ? serverTimestamp() : null,
+      completedAt: completed
+        ? serverTimestamp()
+        : undefined,
     } as any);
   }
 }

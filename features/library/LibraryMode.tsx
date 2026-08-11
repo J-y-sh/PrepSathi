@@ -88,7 +88,6 @@ export function LibraryMode() {
 
   useEffect(() => {
     if (!user || resources.length === 0) {
-      setPlaylistProgress({});
       return;
     }
 
@@ -102,7 +101,6 @@ export function LibraryMode() {
       );
 
       if (youtubeResources.length === 0) {
-        setPlaylistProgress({});
         return;
       }
 

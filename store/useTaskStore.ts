@@ -79,7 +79,7 @@ export const useTaskStore =
           tasks,
           loading: false,
         });
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error(
           "TaskStore: failed to fetch tasks:",
           e
@@ -88,8 +88,9 @@ export const useTaskStore =
         set({
           loading: false,
           error:
-            e?.message ||
-            "Failed to load tasks.",
+            e instanceof Error
+              ? e.message
+              : "Failed to load tasks.",
         });
       }
     },
