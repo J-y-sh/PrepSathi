@@ -4,6 +4,7 @@ const config: CapacitorConfig = {
   appId: "com.prepsathi.app",
   appName: "PrepSathi",
   webDir: "public",
+
   server: {
     url: "https://prep-sathi.vercel.app",
     cleartext: false,
