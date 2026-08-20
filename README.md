@@ -1,36 +1,62 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏛️ UPSC CSE 2028 Command Center (PWA)
 
-## Getting Started
+A mobile-first, full-stack Progressive Web Application (PWA) engineered specifically for **B.Tech CSE students balancing college workloads with UPSC Civil Services Examination preparation**. Built using Vite, React, TypeScript, Tailwind CSS, and powered by Google's Gemini API via edge functions.
 
-First, run the development server:
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![PWA Ready](https://img.shields.io/badge/PWA-Supported-emerald.svg)
+![React](https://img.shields.io/badge/React-18.x-61dafb.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## ✨ Core Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### ⚡ 1. 15-Minute Lecture-Gap Sprint Engine
+Designed for 10–15 minute free gaps between college classes. Launches three high-yield quick modes:
+- **Active Recall Flashcards:** Practice 5 flashcards from your weakest subject.
+- **1-Page High-Yield News Summary:** Crisp GS2/GS3 current affairs summaries.
+- **3-MCQ Drill:** Instant UPSC-style prelims questions with AI-generated explanations.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 🧠 2. Active Recall Vault (Spaced Repetition System)
+- Anki-style flashcard engine powered by the **SuperMemo-2 (SM-2)** algorithm.
+- Rate card recall difficulty (`Again`, `Hard`, `Good`, `Easy`) to automatically recalculate review queues.
+- **Batch AI Generation:** Single-tap generation of 30-card decks from any topic or textbook chapter using Gemini API.
 
-## Learn More
+### 💬 3. AI Mentor "Prep" (Voice & Chat)
+- Persistent AI study partner trained for UPSC CSE context.
+- **Speech-to-Text Input:** Tap to speak with Prep while walking between lecture halls.
+- **Proactive Nudge Engine:** Evaluates daily hours. If B.Tech coursework pushes study targets behind, Prep recalibrates weekly plans automatically.
 
-To learn more about Next.js, take a look at the following resources:
+### ✍️ 4. Interactive Mains Answer Sandbox & AI Grading
+- Daily 10/15-marker Mains questions with live 150-word count indicators.
+- **Vision OCR Upload:** Snap a photo of physical handwritten answer sheets to receive instant AI scoring (out of 10), structure feedback, and missing keyword reports.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 📊 5. B.Tech vs. UPSC Time Audit
+- Multi-device study logging: `B.Tech (IIIT Nagpur)` vs `UPSC Prep`.
+- **Chart.js Analytics:** Visualizes trailing 7-day balance with automatic warning banners if weekly UPSC study hours drop below 15 hours.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🛠️ Tech Stack
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Frontend:** React 18, TypeScript, Tailwind CSS, Lucide Icons, Framer Motion
+- **PWA & Offline:** Web Manifest, Service Worker caching, LocalStorage/IndexedDB offline sync
+- **AI Engine:** Google Gemini API (`gemini-2.5-flash`) via edge serverless functions
+- **Database:** Bolt Database (PostgreSQL / RLS enabled for multi-device sync)
+- **Charts:** Chart.js / React-Chartjs-2
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 🚀 Quick Start & Local Setup
+
+### Prerequisites
+- Node.js (v18 or higher)
+- npm or pnpm
+- A free **Gemini API Key** from [Google AI Studio] (https://aistudio.google.com/)
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone [https://github.com/YOUR-USERNAME/upsc-2028-command-center.git](https://github.com/YOUR-USERNAME/upsc-2028-command-center.git)
+   cd upsc-2028-command-center
